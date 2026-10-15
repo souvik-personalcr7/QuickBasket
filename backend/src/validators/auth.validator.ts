@@ -1,0 +1,41 @@
+import { z } from 'zod';
+
+export const registerSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name cannot exceed 100 characters'),
+  email: z.string().email('Please enter a valid email address'),
+  phone: z.string().min(8, 'Phone number must be at least 8 digits'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+  role: z.enum(['customer', 'shop_owner', 'delivery_partner', 'admin']).default('customer'),
+  avatar: z.string().optional(),
+  address: z
+    .object({
+      street: z.string().optional(),
+      city: z.string().optional(),
+      postalCode: z.string().optional(),
+      state: z.string().optional(),
+    })
+    .optional(),
+  shopDetails: z
+    .object({
+      shopName: z.string().optional(),
+      category: z.string().optional(),
+      address: z.string().optional(),
+    })
+    .optional(),
+  deliveryDetails: z
+    .object({
+      vehicleType: z.string().optional(),
+      vehicleNumber: z.string().optional(),
+      city: z.string().optional(),
+    })
+    .optional(),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+  role: z.enum(['customer', 'shop_owner', 'delivery_partner', 'admin']).optional(),
+});
+
+export type RegisterInput = z.infer<typeof registerSchema>;
+export type LoginInput = z.infer<typeof loginSchema>;

@@ -1,10 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Store, Bike, MapPin, Search } from 'lucide-react';
+import { ShoppingBag, Store, Bike, MapPin, Search, LogOut } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 export const Navbar: React.FC = () => {
+  const [mounted, setMounted] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -65,12 +72,28 @@ export const Navbar: React.FC = () => {
               <span className="hidden sm:inline">Delivery Partner</span>
             </Link>
 
-            <Link
-              href="/login"
-              className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
-            >
-              Sign In
-            </Link>
+            {mounted && isAuthenticated && user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 px-2 py-1 bg-slate-100 rounded-lg">
+                  {user.name.split(' ')[0]}
+                </span>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="text-xs font-semibold text-red-600 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <Link
+                href="/login"
+                className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                Sign In
+              </Link>
+            )}
 
             <Link
               href="/cart"
@@ -89,3 +112,4 @@ export const Navbar: React.FC = () => {
     </header>
   );
 };
+

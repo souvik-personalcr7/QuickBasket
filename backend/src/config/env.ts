@@ -9,7 +9,7 @@ const envSchema = z.object({
   CLIENT_URL: z.string().default('http://localhost:3000'),
   MONGODB_URI: z.string().default('mongodb://127.0.0.1:27017/quickbasket'),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters long').default('super_secret_jwt_key_quickbasket_development_change_in_production'),
-  JWT_EXPIRES_IN: z.string().default('7d'),
+  JWT_EXPIRES_IN: z.string().default('365d'),
   DEV_ADMIN_KEY: z.string().default('dev_secret_admin_key_2026'),
 });
 

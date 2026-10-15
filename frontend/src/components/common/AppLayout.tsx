@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider, useCart } from '@/context/CartContext';
 import { Header } from './Header';
 import { Footer } from './Footer';
@@ -21,8 +22,11 @@ const LayoutContent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <CartProvider>
-      <LayoutContent>{children}</LayoutContent>
-    </CartProvider>
+    <AuthProvider>
+      <CartProvider>
+        <LayoutContent>{children}</LayoutContent>
+      </CartProvider>
+    </AuthProvider>
   );
 };
+

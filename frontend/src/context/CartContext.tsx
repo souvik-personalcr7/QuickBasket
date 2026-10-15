@@ -12,6 +12,7 @@ interface CartContextType {
   cartCount: number;
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
 }
 
@@ -32,6 +33,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   };
 
+  const updateQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      removeFromCart(productId);
+      return;
+    }
+    setItems((prev) =>
+      prev.map((i) => (i.id === productId ? { ...i, quantity } : i))
+    );
+  };
+
   const removeFromCart = (productId: string) => {
     setItems((prev) => prev.filter((i) => i.id !== productId));
   };
@@ -49,6 +60,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cartCount,
         addToCart,
         removeFromCart,
+        updateQuantity,
         clearCart,
       }}
     >
@@ -56,6 +68,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </CartContext.Provider>
   );
 };
+
 
 export const useCart = () => {
   const context = useContext(CartContext);
@@ -65,8 +78,10 @@ export const useCart = () => {
       cartCount: 0,
       addToCart: () => {},
       removeFromCart: () => {},
+      updateQuantity: () => {},
       clearCart: () => {},
     };
   }
   return context;
 };
+

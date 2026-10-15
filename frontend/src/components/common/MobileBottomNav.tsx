@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Home, Grid, ShoppingBag, Receipt, User } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface MobileBottomNavProps {
   cartCount?: number;
@@ -15,16 +16,38 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   activeTab = 'home',
   onTabChange,
 }) => {
+  const [mounted, setMounted] = useState(false);
+  const { user, isAuthenticated, role, getRoleRedirectPath } = useAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const profileHref = mounted && isAuthenticated
+    ? role === 'customer'
+      ? '/profile'
+      : getRoleRedirectPath(role!)
+    : '/login';
+
+  const ordersHref = mounted && isAuthenticated ? '/profile' : '#orders';
+
+  const profileLabel = mounted && isAuthenticated && user?.name
+    ? user.name.split(' ')[0]
+    : 'Profile';
+
   const tabs = [
     { id: 'home', label: 'Home', icon: Home, href: '/' },
     { id: 'categories', label: 'Categories', icon: Grid, href: '#categories' },
     { id: 'cart', label: 'Cart', icon: ShoppingBag, href: '/cart', hasBadge: true },
-    { id: 'orders', label: 'Orders', icon: Receipt, href: '#orders' },
-    { id: 'profile', label: 'Profile', icon: User, href: '/login' },
+    { id: 'orders', label: 'Orders', icon: Receipt, href: ordersHref },
+    { id: 'profile', label: profileLabel, icon: User, href: profileHref },
   ];
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+    <nav
+      suppressHydrationWarning
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]"
+    >
       <div className="grid grid-cols-5 h-16 items-center px-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -34,6 +57,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
             <Link
               key={tab.id}
               href={tab.href}
+              suppressHydrationWarning
               onClick={() => onTabChange?.(tab.id)}
               className={`flex flex-col items-center justify-center py-1 transition-colors relative ${
                 isActive ? 'text-[#15803d]' : 'text-slate-500 hover:text-slate-800'
