@@ -175,6 +175,30 @@ function SignupForm() {
       });
 
       if (res.success && res.role) {
+        if (selectedRole === "shop_owner") {
+          try {
+            const rawShops = localStorage.getItem("qb_registered_shops");
+            const shopsList = rawShops ? JSON.parse(rawShops) : [];
+            const newShop = {
+              id: `shop_${Date.now()}`,
+              name: formData.shopName.trim() || `${formData.name}'s Store`,
+              category: formData.category || "Retail & Grocery",
+              address: formData.shopAddress.trim() || formData.city || "Store Address",
+              ownerName: formData.name.trim(),
+              ownerEmail: formData.email.trim(),
+              rating: 4.8,
+              reviewCount: "New Store",
+              deliveryTime: "20-30 mins",
+              isFreeDelivery: true,
+              productCount: 0,
+              image: "https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=350&auto=format&fit=crop&q=80",
+            };
+            shopsList.push(newShop);
+            localStorage.setItem("qb_registered_shops", JSON.stringify(shopsList));
+          } catch (e) {
+            console.error("Failed to save registered shop:", e);
+          }
+        }
         router.push(getRoleRedirectPath(res.role));
       } else {
         setErrorMsg(

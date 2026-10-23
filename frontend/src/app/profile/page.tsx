@@ -80,12 +80,12 @@ export default function ProfilePage() {
 
       {/* Role Shortcut if Merchant or Rider */}
       {isMerchantOrRider && (
-        <div className="p-5 rounded-3xl bg-amber-50 border border-amber-200 flex items-center justify-between gap-4">
+        <div className="p-5 rounded-3xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {role === 'shop_owner' ? (
-              <Store className="w-6 h-6 text-amber-700" />
+              <Store className="w-6 h-6 text-emerald-700" />
             ) : (
-              <Bike className="w-6 h-6 text-blue-700" />
+              <Bike className="w-6 h-6 text-emerald-700" />
             )}
             <div>
               <h2 className="text-sm font-extrabold text-slate-900">
@@ -98,11 +98,77 @@ export default function ProfilePage() {
           </div>
           <Link
             href={getRoleRedirectPath(role)}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center gap-1.5 shrink-0"
+            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors"
           >
             <span>Open Dashboard</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
+        </div>
+      )}
+
+      {/* Shop Owner Registered Details */}
+      {role === 'shop_owner' && user.shopDetails && (
+        <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Store className="w-4 h-4 text-emerald-600" />
+              <span>Registered Storefront Details</span>
+            </h2>
+            <Link
+              href="/shop"
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors"
+            >
+              Manage Catalog & Orders &rarr;
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Shop Name</span>
+              <p className="font-extrabold text-slate-900 text-sm">{user.shopDetails.shopName || 'Not specified'}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Category</span>
+              <p className="font-semibold text-slate-800">{user.shopDetails.category || 'General Store'}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Address</span>
+              <p className="font-semibold text-slate-800">{user.shopDetails.address || 'Address not configured'}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Partner Registered Details */}
+      {role === 'delivery_partner' && user.deliveryDetails && (
+        <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
+            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Bike className="w-4 h-4 text-emerald-600" />
+              <span>Registered Rider & Fleet Details</span>
+            </h2>
+            <Link
+              href="/delivery"
+              className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors"
+            >
+              Open Dispatch Dashboard &rarr;
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Vehicle Type</span>
+              <p className="font-extrabold text-slate-900 text-sm">{user.deliveryDetails.vehicleType || 'Not specified'}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Vehicle Plate Number</span>
+              <p className="font-semibold text-slate-800">{user.deliveryDetails.vehicleNumber || 'Not registered'}</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Fleet City / Zone</span>
+              <p className="font-semibold text-slate-800">{user.deliveryDetails.city || 'Zone not assigned'}</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -139,25 +205,12 @@ export default function ProfilePage() {
             </Link>
           </div>
 
-          <div className="space-y-3">
-            {[
-              { id: 'QB-8891', date: 'Yesterday, 6:45 PM', items: 'Fresh Spinach 500g, Amul Taaza Milk 1L, Brown Bread', total: '₹225', status: 'Delivered' },
-              { id: 'QB-8762', date: '12 Oct, 11:20 AM', items: 'Farm Eggs (12 pack), Bananas 1kg, Shimla Apples 1kg', total: '₹340', status: 'Delivered' },
-            ].map((ord) => (
-              <div key={ord.id} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100 text-xs">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-slate-900">{ord.id}</span>
-                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full text-[10px]">
-                    {ord.status}
-                  </span>
-                </div>
-                <p className="text-slate-500 line-clamp-1">{ord.items}</p>
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-200/60 text-[11px]">
-                  <span className="text-slate-400">{ord.date}</span>
-                  <span className="font-bold text-slate-900">{ord.total}</span>
-                </div>
-              </div>
-            ))}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+            <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="text-xs font-bold text-slate-800">No past orders yet</p>
+            <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+              Once you place grocery orders on QuickBasket, your order receipts and delivery tracking will be shown here.
+            </p>
           </div>
         </div>
       </div>

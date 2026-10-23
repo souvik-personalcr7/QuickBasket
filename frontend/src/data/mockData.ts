@@ -17,6 +17,9 @@ export interface Product {
   image: string;
   rating?: number;
   isPopular?: boolean;
+  stock?: number;
+  shopId?: string;
+  shopName?: string;
 }
 
 export interface Shop {
@@ -28,6 +31,12 @@ export interface Shop {
   deliveryTime: string;
   isFreeDelivery: boolean;
   image: string;
+  address?: string;
+  ownerId?: string;
+  ownerEmail?: string;
+  isOpen?: boolean;
+  productCount?: number;
+  products?: Product[];
 }
 
 export const CATEGORIES: Category[] = [
@@ -87,110 +96,49 @@ export const CATEGORIES: Category[] = [
     image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=300&auto=format&fit=crop&q=80',
     bgTint: 'bg-sky-50/70',
   },
-];
-
-export const FEATURED_PRODUCTS: Product[] = [
   {
-    id: 'prod-1',
-    name: 'Fresh Tomato',
-    category: 'Vegetables',
-    unit: '1 kg',
-    price: 45,
-    originalPrice: 55,
-    image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&auto=format&fit=crop&q=80',
-    rating: 4.8,
+    id: 'cat-8',
+    name: 'Bakery & Bread',
+    slug: 'bakery-bread',
+    itemCount: '45+ items',
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=300&auto=format&fit=crop&q=80',
+    bgTint: 'bg-amber-50/70',
   },
   {
-    id: 'prod-2',
-    name: 'Banana',
-    category: 'Fruits',
-    unit: '1 kg',
-    price: 60,
-    originalPrice: 70,
-    image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400&auto=format&fit=crop&q=80',
-    rating: 4.9,
+    id: 'cat-9',
+    name: 'Instant & Frozen',
+    slug: 'instant-frozen',
+    itemCount: '60+ items',
+    image: 'https://images.unsplash.com/photo-1621996346565-e3d5d6281292?w=300&auto=format&fit=crop&q=80',
+    bgTint: 'bg-cyan-50/70',
   },
   {
-    id: 'prod-3',
-    name: 'Fresh Milk',
-    category: 'Dairy',
-    unit: '1 liter',
-    price: 110,
-    originalPrice: 120,
-    image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=400&auto=format&fit=crop&q=80',
-    rating: 4.7,
+    id: 'cat-10',
+    name: 'Organic & Gourmet',
+    slug: 'organic-gourmet',
+    itemCount: '40+ items',
+    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=300&auto=format&fit=crop&q=80',
+    bgTint: 'bg-emerald-50/70',
   },
   {
-    id: 'prod-4',
-    name: 'Eggs',
-    category: 'Dairy & Eggs',
-    unit: '12 pcs',
-    price: 150,
-    originalPrice: 165,
-    image: 'https://images.unsplash.com/photo-1506976785307-8732e854ad03?w=400&auto=format&fit=crop&q=80',
-    rating: 4.8,
+    id: 'cat-11',
+    name: 'Tea, Coffee & Drinks',
+    slug: 'tea-coffee-drinks',
+    itemCount: '85+ items',
+    image: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=300&auto=format&fit=crop&q=80',
+    bgTint: 'bg-yellow-50/70',
   },
   {
-    id: 'prod-5',
-    name: 'Bread',
-    category: 'Bakery',
-    unit: '400 gm',
-    price: 55,
-    originalPrice: 65,
-    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop&q=80',
-    rating: 4.6,
-  },
-  {
-    id: 'prod-6',
-    name: 'Cooking Oil',
-    category: 'Pantry',
-    unit: '1 liter',
-    price: 180,
-    originalPrice: 200,
-    image: 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?w=400&auto=format&fit=crop&q=80',
-    rating: 4.7,
+    id: 'cat-12',
+    name: 'Cleaning & Hygiene',
+    slug: 'cleaning-hygiene',
+    itemCount: '50+ items',
+    image: 'https://images.unsplash.com/photo-1585421514738-01798e348b17?w=300&auto=format&fit=crop&q=80',
+    bgTint: 'bg-teal-50/70',
   },
 ];
 
-export const POPULAR_SHOPS: Shop[] = [
-  {
-    id: 'shop-1',
-    name: 'FreshMart',
-    category: 'Grocery & Essentials',
-    rating: 4.6,
-    reviewCount: '1.2k+',
-    deliveryTime: '20-30 mins',
-    isFreeDelivery: true,
-    image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=350&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'shop-2',
-    name: 'Green Valley',
-    category: 'Organic & Fresh',
-    rating: 4.7,
-    reviewCount: '856+',
-    deliveryTime: '25-35 mins',
-    isFreeDelivery: true,
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=350&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'shop-3',
-    name: 'Daily Needs',
-    category: 'Grocery Store',
-    rating: 4.6,
-    reviewCount: '743+',
-    deliveryTime: '15-25 mins',
-    isFreeDelivery: true,
-    image: 'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=350&auto=format&fit=crop&q=80',
-  },
-  {
-    id: 'shop-4',
-    name: 'Happy Mart',
-    category: 'Daily Essentials',
-    rating: 4.5,
-    reviewCount: '620+',
-    deliveryTime: '30-40 mins',
-    isFreeDelivery: true,
-    image: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=350&auto=format&fit=crop&q=80',
-  },
-];
+export const FEATURED_PRODUCTS: Product[] = [];
+
+export const POPULAR_SHOPS: Shop[] = [];
+

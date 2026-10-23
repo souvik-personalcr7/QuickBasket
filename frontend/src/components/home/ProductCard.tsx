@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, ShoppingCart, Check } from 'lucide-react';
+import { Heart, ShoppingCart, Check, IndianRupee } from 'lucide-react';
 import { Product } from '@/data/mockData';
 
 interface ProductCardProps {
@@ -61,10 +61,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         </p>
         
         {/* Price */}
-        <div className="pt-1 flex items-baseline">
-          <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-            ৳ {product.price}
+        <div className="pt-1 flex items-center gap-2">
+          <span className="text-base sm:text-lg font-black text-slate-900 tracking-tight inline-flex items-center">
+            <IndianRupee className="w-4 h-4 sm:w-4.5 sm:h-4.5 stroke-[2.5]" />
+            <span>{product.price}</span>
           </span>
+          {product.originalPrice && (
+            <span className="text-xs text-slate-400 line-through font-medium inline-flex items-center">
+              <IndianRupee className="w-3 h-3 stroke-[2]" />
+              <span>{product.originalPrice}</span>
+            </span>
+          )}
         </div>
       </div>
 

@@ -1,63 +1,83 @@
+'use client';
+
 import React from 'react';
-import Link from 'next/link';
 import { Star, Bike, ChevronRight } from 'lucide-react';
 import { Shop } from '@/data/mockData';
 
 interface ShopCardProps {
   shop: Shop;
+  onSelect?: (shop: Shop) => void;
+  isSelected?: boolean;
 }
 
-export const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
+export const ShopCard: React.FC<ShopCardProps> = ({ shop, onSelect, isSelected }) => {
   return (
-    <Link
-      href={`#shop-${shop.id}`}
-      className="group bg-white rounded-2xl border border-slate-100 p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_8px_20px_-4px_rgba(21,128,61,0.1)] hover:border-emerald-200 transition-all duration-200"
+    <button
+      type="button"
+      onClick={() => onSelect?.(shop)}
+      className={`group w-full h-full text-left bg-white rounded-2xl border p-3.5 sm:p-4 flex items-center gap-3.5 shadow-2xs hover:shadow-md hover:border-emerald-300 transition-all duration-200 cursor-pointer ${
+        isSelected
+          ? 'border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 shadow-xs'
+          : 'border-slate-200/80 hover:bg-slate-50/40'
+      }`}
     >
-      <div className="flex items-center gap-3 min-w-0">
-        {/* Shop Thumbnail */}
-        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-          <img
-            src={shop.image}
-            alt={shop.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-            loading="lazy"
-          />
-        </div>
+      {/* Shop Thumbnail */}
+      <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden bg-slate-100 shrink-0 relative border border-slate-100 shadow-2xs">
+        <img
+          src={shop.image}
+          alt={shop.name}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          loading="lazy"
+        />
+        {shop.isOpen === false && (
+          <span className="absolute inset-0 bg-slate-900/65 flex items-center justify-center text-[10px] font-bold text-white backdrop-blur-[1px]">
+            Closed
+          </span>
+        )}
+      </div>
 
-        {/* Shop Info */}
-        <div className="space-y-0.5 min-w-0">
-          <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#15803d] transition-colors truncate">
+      {/* Shop Info */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center space-y-1">
+        <div className="flex items-center justify-between gap-1">
+          <h3 className="text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-emerald-700 transition-colors truncate">
             {shop.name}
           </h3>
-          <p className="text-xs text-slate-500 truncate">
-            {shop.category}
-          </p>
+          <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all shrink-0" />
+        </div>
 
-          <div className="flex items-center gap-2 pt-0.5 text-xs">
-            {/* Rating */}
-            <span className="flex items-center gap-1 font-bold text-slate-800">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-              {shop.rating}
-              <span className="text-slate-400 font-normal text-[11px]">
-                ({shop.reviewCount})
-              </span>
+        <p className="text-xs text-slate-500 truncate font-medium">
+          {shop.category}
+        </p>
+
+        <div className="flex items-center gap-2 pt-0.5 text-xs">
+          {/* Rating */}
+          <span className="flex items-center gap-1 font-bold text-slate-800 text-[11px] shrink-0">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+            <span>{shop.rating}</span>
+            <span className="text-slate-400 font-normal text-[10px]">
+              ({shop.reviewCount})
             </span>
+          </span>
 
-            {/* Free Delivery Tag */}
-            {shop.isFreeDelivery && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-[#15803d]">
-                <Bike className="w-3 h-3 text-[#15803d]" />
-                Free Delivery
+          <span className="text-slate-300 text-xs shrink-0">•</span>
+
+          {/* Delivery Time */}
+          <span className="text-[11px] text-slate-500 font-medium truncate">
+            {shop.deliveryTime || '20-30 mins'}
+          </span>
+
+          {/* Free Delivery Tag */}
+          {shop.isFreeDelivery && (
+            <>
+              <span className="text-slate-300 text-xs hidden sm:inline shrink-0">•</span>
+              <span className="hidden sm:inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 shrink-0">
+                <Bike className="w-2.5 h-2.5" />
+                Free
               </span>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
-
-      {/* Right Arrow / Action */}
-      <div className="p-1 text-slate-300 group-hover:text-[#15803d] group-hover:translate-x-0.5 transition-all">
-        <ChevronRight className="w-5 h-5" />
-      </div>
-    </Link>
+    </button>
   );
 };

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Search, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, ChevronDown, Shield } from 'lucide-react';
+import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface HeaderProps {
@@ -10,7 +10,7 @@ interface HeaderProps {
   onOpenSearch?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) => {
+export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
@@ -22,6 +22,17 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Lock background scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [mobileMenuOpen]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -46,20 +57,20 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
     switch (userRole) {
       case 'shop_owner':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-            <Store className="w-3 h-3" /> Shop Owner
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <Store className="w-3 h-3 text-emerald-700" /> Shop Owner
           </span>
         );
       case 'delivery_partner':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200">
-            <Bike className="w-3 h-3" /> Delivery Partner
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <Bike className="w-3 h-3 text-emerald-700" /> Delivery Partner
           </span>
         );
       case 'admin':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-            <Shield className="w-3 h-3" /> Admin
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+            <Shield className="w-3 h-3 text-emerald-700" /> Admin
           </span>
         );
       default:
@@ -84,6 +95,10 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
     }
   };
 
+  const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
+  const isShopOwner = mounted && isAuthenticated && role === 'shop_owner';
+  const isStaffPortal = isDeliveryPartner || isShopOwner;
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-100 transition-all">
@@ -102,9 +117,12 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
               </button>
             </div>
 
-            {/* Brand Logo & Tagline */}
-            <div className="flex items-center">
-              <Link href="/" className="flex items-center gap-2.5 group">
+            {/* Brand Logo & Tagline: Consistent Brand Colors */}
+            <div className="flex items-center gap-3">
+              <Link
+                href={isDeliveryPartner ? "/delivery" : isShopOwner ? "/shop" : "/"}
+                className="flex items-center gap-2.5 group"
+              >
                 <div className="w-10 h-10 rounded-xl bg-[#15803d] flex items-center justify-center text-white shadow-sm group-hover:bg-[#166534] transition-colors">
                   <ShoppingCart className="w-5 h-5 text-white" />
                 </div>
@@ -117,56 +135,97 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                   </span>
                 </div>
               </Link>
+
+              {isDeliveryPartner && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <Bike className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Rider Mode</span>
+                </span>
+              )}
+
+              {isShopOwner && (
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                  <Store className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Merchant Mode</span>
+                </span>
+              )}
             </div>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden md:flex items-center gap-8">
-              {navLinks.map((link) => {
-                const isActive = activeNav === link.name;
-                return (
-                  <Link
-                    key={link.name}
-                    href={link.href}
-                    onClick={() => setActiveNav(link.name)}
-                    className={`relative text-sm font-semibold transition-colors py-1 ${
-                      isActive
-                        ? 'text-[#15803d]'
-                        : 'text-slate-600 hover:text-[#15803d]'
-                    }`}
-                  >
-                    {link.name}
-                    {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#15803d] rounded-full" />
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
+            {/* Desktop Navigation Links: Delivery vs Shop Owner vs Customer */}
+            {isDeliveryPartner ? (
+              <nav className="hidden md:flex items-center gap-4">
+                <Link
+                  href="/delivery"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#15803d] text-white shadow-xs hover:bg-[#166534] transition-colors"
+                >
+                  <Bike className="w-4 h-4" />
+                  <span>Rider Dispatch Board</span>
+                </Link>
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Rider Details</span>
+                </Link>
+              </nav>
+            ) : isShopOwner ? (
+              <nav className="hidden md:flex items-center gap-4">
+                <Link
+                  href="/shop"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#15803d] text-white shadow-xs hover:bg-[#166534] transition-colors"
+                >
+                  <Store className="w-4 h-4" />
+                  <span>Store Catalog & Orders</span>
+                </Link>
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors"
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Store Details</span>
+                </Link>
+              </nav>
+            ) : (
+              <nav className="hidden md:flex items-center gap-8">
+                {navLinks.map((link) => {
+                  const isActive = activeNav === link.name;
+                  return (
+                    <Link
+                      key={link.name}
+                      href={link.href}
+                      onClick={() => setActiveNav(link.name)}
+                      className={`relative text-sm font-semibold transition-colors py-1 ${
+                        isActive
+                          ? 'text-[#15803d]'
+                          : 'text-slate-600 hover:text-[#15803d]'
+                      }`}
+                    >
+                      {link.name}
+                      {isActive && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#15803d] rounded-full" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </nav>
+            )}
 
-            {/* Right Action Icons: Search, Cart, Login/Signup or User Profile */}
+            {/* Right Action Area */}
             <div className="flex items-center gap-3 sm:gap-4">
-              
-              {/* Search Icon Button */}
-              <button
-                type="button"
-                onClick={onOpenSearch}
-                aria-label="Search products"
-                className="p-2 text-slate-600 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors"
-              >
-                <Search className="w-5 h-5" />
-              </button>
-
-              {/* Cart Icon with Counter Badge */}
-              <Link
-                href="/cart"
-                className="relative p-2 text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors"
-                aria-label="View Cart"
-              >
-                <ShoppingBag className="w-6 h-6" />
-                <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[#15803d] text-white text-[10px] font-bold rounded-full px-1 shadow-sm">
-                  {cartCount}
-                </span>
-              </Link>
+              {/* Only show Cart if NOT a Delivery Partner AND NOT a Shop Owner */}
+              {!isStaffPortal && (
+                <Link
+                  href="/cart"
+                  className="relative p-2 text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors"
+                  aria-label="View Cart"
+                >
+                  <ShoppingBag className="w-6 h-6" />
+                  <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[#15803d] text-white text-[10px] font-bold rounded-full px-1 shadow-sm">
+                    {cartCount}
+                  </span>
+                </Link>
+              )}
 
               {/* Auth Section: User Dropdown or Login Button */}
               {mounted && isAuthenticated && user ? (
@@ -174,20 +233,20 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                   <button
                     type="button"
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                    className="flex items-center gap-2.5 p-1.5 pl-2.5 pr-2 rounded-full border border-slate-200 hover:border-emerald-300 hover:bg-slate-50 transition-all focus:outline-none"
+                    aria-label="User account menu"
+                    className="flex items-center gap-2.5 p-1 lg:pl-1.5 lg:pr-3.5 rounded-full border border-slate-200/90 hover:border-emerald-400 hover:bg-emerald-50/50 shadow-xs transition-all focus:outline-none cursor-pointer"
                   >
                     <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs">
                       {user.name ? user.name.charAt(0) : <UserIcon className="w-4 h-4" />}
                     </div>
                     <div className="hidden lg:flex flex-col text-left">
-                      <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[110px]">
+                      <span className="text-xs font-bold text-slate-800 leading-tight truncate max-w-[120px]">
                         {user.name}
                       </span>
                       <span className="text-[10px] text-emerald-700 font-semibold capitalize">
                         {user.role.replace('_', ' ')}
                       </span>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
                   </button>
 
                   {/* Dropdown Menu */}
@@ -205,10 +264,29 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
                         >
-                          {user.role === 'shop_owner' && <Store className="w-4 h-4 text-emerald-600" />}
-                          {user.role === 'delivery_partner' && <Bike className="w-4 h-4 text-emerald-600" />}
-                          {user.role === 'customer' && <ShoppingBag className="w-4 h-4 text-emerald-600" />}
+                          {isDeliveryPartner ? (
+                            <Bike className="w-4 h-4 text-emerald-600" />
+                          ) : user.role === 'shop_owner' ? (
+                            <Store className="w-4 h-4 text-emerald-600" />
+                          ) : (
+                            <ShoppingBag className="w-4 h-4 text-emerald-600" />
+                          )}
                           <span>{getRolePortalName(user.role)}</span>
+                        </Link>
+
+                        <Link
+                          href="/profile"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                        >
+                          <UserIcon className="w-4 h-4 text-slate-500" />
+                          <span>{
+                            isDeliveryPartner
+                              ? 'Rider Profile & Fleet Info'
+                              : isShopOwner
+                              ? 'Store Profile & Details'
+                              : 'My Profile'
+                          }</span>
                         </Link>
                       </div>
 
@@ -219,7 +297,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                             setUserDropdownOpen(false);
                             logout();
                           }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer"
                         >
                           <LogOut className="w-4 h-4 text-red-500" />
                           <span>Log Out</span>
@@ -247,15 +325,23 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
 
       {/* Mobile Slide-Out Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs">
-          <div className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-xl flex flex-col justify-between overflow-y-auto">
+        <div
+          className="md:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          <div
+            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-xl flex flex-col justify-between overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div>
               <div className="flex items-center justify-between pb-6 border-b border-slate-100">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 rounded-lg bg-[#15803d] flex items-center justify-center text-white">
                     <ShoppingCart className="w-4 h-4 text-white" />
                   </div>
-                  <span className="font-extrabold text-lg text-[#166534]">QuickBasket</span>
+                  <span className="font-extrabold text-lg text-[#166534]">
+                    QuickBasket
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -274,44 +360,87 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                 </div>
               )}
 
-              <nav className="mt-4 space-y-2">
-                {navLinks.map((link) => (
+              {/* Mobile Links: Delivery vs Shop Owner vs Customer */}
+              {isDeliveryPartner ? (
+                <nav className="mt-4 space-y-2">
                   <Link
-                    key={link.name}
-                    href={link.href}
-                    onClick={() => {
-                      setActiveNav(link.name);
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`block px-3 py-2 text-base font-semibold rounded-lg ${
-                      activeNav === link.name
-                        ? 'bg-emerald-50 text-[#15803d]'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
+                    href="/delivery"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-bold rounded-xl bg-emerald-50 text-[#15803d] border border-emerald-200"
                   >
-                    {link.name}
+                    <Bike className="w-4 h-4 text-[#15803d]" />
+                    <span>Rider Dispatch Board</span>
                   </Link>
-                ))}
-              </nav>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-50"
+                  >
+                    <UserIcon className="w-4 h-4 text-slate-500" />
+                    <span>Rider Fleet Profile</span>
+                  </Link>
+                </nav>
+              ) : isShopOwner ? (
+                <nav className="mt-4 space-y-2">
+                  <Link
+                    href="/shop"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-bold rounded-xl bg-emerald-50 text-[#15803d] border border-emerald-200"
+                  >
+                    <Store className="w-4 h-4 text-[#15803d]" />
+                    <span>Store Catalog & Orders</span>
+                  </Link>
+                  <Link
+                    href="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-50"
+                  >
+                    <UserIcon className="w-4 h-4 text-slate-500" />
+                    <span>Storefront Profile</span>
+                  </Link>
+                </nav>
+              ) : (
+                <>
+                  <nav className="mt-4 space-y-2">
+                    {navLinks.map((link) => (
+                      <Link
+                        key={link.name}
+                        href={link.href}
+                        onClick={() => {
+                          setActiveNav(link.name);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`block px-3 py-2 text-base font-semibold rounded-lg ${
+                          activeNav === link.name
+                            ? 'bg-emerald-50 text-[#15803d]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {link.name}
+                      </Link>
+                    ))}
+                  </nav>
 
-              <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
-                <Link
-                  href="/shop"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
-                >
-                  <Store className="w-4 h-4 text-emerald-600" />
-                  <span>Shop Owner Portal</span>
-                </Link>
-                <Link
-                  href="/delivery"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
-                >
-                  <Bike className="w-4 h-4 text-emerald-600" />
-                  <span>Delivery Partner App</span>
-                </Link>
-              </div>
+                  <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+                    <Link
+                      href="/shop"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
+                    >
+                      <Store className="w-4 h-4 text-emerald-600" />
+                      <span>Shop Owner Portal</span>
+                    </Link>
+                    <Link
+                      href="/delivery"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
+                    >
+                      <Bike className="w-4 h-4 text-emerald-600" />
+                      <span>Delivery Partner App</span>
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="pt-6 border-t border-slate-100">
@@ -322,7 +451,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0, onOpenSearch }) =
                     setMobileMenuOpen(false);
                     logout();
                   }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-full shadow-sm text-center transition-colors"
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-full shadow-sm text-center transition-colors cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   Log Out
