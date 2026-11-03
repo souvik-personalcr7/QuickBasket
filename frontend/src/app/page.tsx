@@ -304,7 +304,7 @@ export default function CustomerHomePage() {
 
           {/* Grid of Results or Empty State */}
           {filteredProducts.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
               {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}
@@ -402,7 +402,7 @@ export default function CustomerHomePage() {
 
             {/* Grid of products from this shop owner */}
             {selectedShopProducts.length > 0 ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
                 {selectedShopProducts.map((product) => (
                   <ProductCard
                     key={product.id}

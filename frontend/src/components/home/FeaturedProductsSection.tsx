@@ -16,7 +16,7 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
   onAddToCart,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const displayedProducts = isExpanded ? products : products.slice(0, 12);
+  const displayedProducts = isExpanded ? products : products.slice(0, 14);
 
   return (
     <section id="featured-products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -31,7 +31,7 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
           </p>
         </div>
 
-        {products.length > 12 && (
+        {products.length > 14 && (
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -47,7 +47,7 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
 
       {/* Grid of Real Products OR Empty State */}
       {products.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
           {displayedProducts.map((product) => (
             <ProductCard
               key={product.id}
