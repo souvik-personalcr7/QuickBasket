@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MoreVertical } from 'lucide-react';
+import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface HeaderProps {
@@ -335,20 +335,6 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   </Link>
                 </div>
               )}
-
-              {/* Three-Dot Mobile Menu Button */}
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMobileMenuOpen((prev) => !prev);
-                }}
-                className="md:hidden p-1.5 text-slate-600 hover:text-emerald-700 rounded-full hover:bg-slate-100 transition-colors focus:outline-none cursor-pointer touch-manipulation active:scale-95"
-                aria-label="More options"
-                title="Options Menu"
-              >
-                <MoreVertical className="w-5 h-5" />
-              </button>
             </div>
 
           </div>
