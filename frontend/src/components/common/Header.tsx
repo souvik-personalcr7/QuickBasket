@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield } from 'lucide-react';
+import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MoreVertical } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface HeaderProps {
@@ -109,8 +109,11 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
             <div className="flex items-center md:hidden">
               <button
                 type="button"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="p-2 -ml-2 text-slate-700 hover:text-emerald-700 focus:outline-none"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMobileMenuOpen((prev) => !prev);
+                }}
+                className="p-2 text-slate-700 hover:text-emerald-700 focus:outline-none cursor-pointer touch-manipulation active:scale-95 transition-transform"
                 aria-label="Open menu"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -118,19 +121,19 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
             </div>
 
             {/* Brand Logo & Tagline: Consistent Brand Colors */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               <Link
                 href={isDeliveryPartner ? "/delivery" : isShopOwner ? "/shop" : "/"}
-                className="flex items-center gap-2.5 group"
+                className="flex items-center gap-2 sm:gap-2.5 group min-w-0"
               >
-                <div className="w-10 h-10 rounded-xl bg-[#15803d] flex items-center justify-center text-white shadow-sm group-hover:bg-[#166534] transition-colors">
-                  <ShoppingCart className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#15803d] flex items-center justify-center text-white shadow-sm group-hover:bg-[#166534] transition-colors shrink-0">
+                  <ShoppingCart className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
-                <div className="flex flex-col">
-                  <span className="font-extrabold text-xl tracking-tight text-[#166534] leading-tight">
+                <div className="flex flex-col min-w-0">
+                  <span className="font-extrabold text-lg sm:text-xl tracking-tight text-[#166534] leading-tight truncate">
                     Quick<span className="text-[#15803d]">Basket</span>
                   </span>
-                  <span className="text-[11px] font-medium text-slate-500 tracking-tight leading-none mt-0.5">
+                  <span className="text-[10px] sm:text-[11px] font-medium text-slate-500 tracking-tight leading-none mt-0.5 truncate hidden xs:block">
                     Fresh Groceries, Fast Delivery
                   </span>
                 </div>
@@ -212,7 +215,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
             )}
 
             {/* Right Action Area */}
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               {/* Only show Cart if NOT a Delivery Partner AND NOT a Shop Owner */}
               {!isStaffPortal && (
                 <Link
@@ -220,21 +223,24 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   className="relative p-2 text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors"
                   aria-label="View Cart"
                 >
-                  <ShoppingBag className="w-6 h-6" />
+                  <ShoppingBag className="w-5 h-5 sm:w-6 sm:h-6" />
                   <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] flex items-center justify-center bg-[#15803d] text-white text-[10px] font-bold rounded-full px-1 shadow-sm">
                     {cartCount}
                   </span>
                 </Link>
               )}
 
-              {/* Auth Section: User Dropdown or Login Button */}
+              {/* Auth Section: User Dropdown or Login Button (Always visible on mobile!) */}
               {mounted && isAuthenticated && user ? (
                 <div className="relative" ref={dropdownRef}>
                   <button
                     type="button"
-                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setUserDropdownOpen(!userDropdownOpen);
+                    }}
                     aria-label="User account menu"
-                    className="flex items-center gap-2.5 p-1 lg:pl-1.5 lg:pr-3.5 rounded-full border border-slate-200/90 hover:border-emerald-400 hover:bg-emerald-50/50 shadow-xs transition-all focus:outline-none cursor-pointer"
+                    className="flex items-center gap-2 p-1 lg:pl-1.5 lg:pr-3.5 rounded-full border border-slate-200/90 hover:border-emerald-400 hover:bg-emerald-50/50 shadow-xs transition-all focus:outline-none cursor-pointer touch-manipulation"
                   >
                     <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs uppercase shadow-xs">
                       {user.name ? user.name.charAt(0) : <UserIcon className="w-4 h-4" />}
@@ -307,7 +313,20 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  {/* Mobile User Icon (Always visible on mobile when logged out) */}
+                  <Link
+                    href="/login"
+                    aria-label="User Account / Sign In"
+                    className="sm:hidden p-1.5 text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors flex items-center justify-center cursor-pointer touch-manipulation"
+                    title="Account / Login"
+                  >
+                    <div className="w-8 h-8 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:text-emerald-700 hover:border-emerald-400 shadow-2xs">
+                      <UserIcon className="w-4 h-4" />
+                    </div>
+                  </Link>
+
+                  {/* Desktop Login Button */}
                   <Link
                     href="/login"
                     className="hidden sm:inline-flex items-center justify-center px-5 py-2 text-sm font-semibold text-white bg-[#0f5132] hover:bg-[#166534] rounded-full shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-1"
@@ -317,6 +336,19 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 </div>
               )}
 
+              {/* Three-Dot Mobile Menu Button */}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMobileMenuOpen((prev) => !prev);
+                }}
+                className="md:hidden p-1.5 text-slate-600 hover:text-emerald-700 rounded-full hover:bg-slate-100 transition-colors focus:outline-none cursor-pointer touch-manipulation active:scale-95"
+                aria-label="More options"
+                title="Options Menu"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </button>
             </div>
 
           </div>
@@ -326,11 +358,15 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
       {/* Mobile Slide-Out Menu */}
       {mobileMenuOpen && (
         <div
-          className="md:hidden fixed inset-0 z-50 bg-black/40 backdrop-blur-xs"
-          onClick={() => setMobileMenuOpen(false)}
+          className="md:hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setMobileMenuOpen(false);
+            }
+          }}
         >
           <div
-            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-xl flex flex-col justify-between overflow-y-auto"
+            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div>

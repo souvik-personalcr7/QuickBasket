@@ -1,4 +1,16 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+export const getApiBaseUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== 'undefined') {
+    // Dynamically use the same host IP (e.g. 192.168.x.x) for mobile testing over Wi-Fi
+    const hostname = window.location.hostname;
+    return `http://${hostname}:5000/api/v1`;
+  }
+  return 'http://localhost:5000/api/v1';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -11,7 +23,8 @@ export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const baseUrl = getApiBaseUrl();
+  const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
   const headers = {
     'Content-Type': 'application/json',

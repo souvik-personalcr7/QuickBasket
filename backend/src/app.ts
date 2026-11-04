@@ -19,7 +19,17 @@ export const createApp = (): Application => {
 
   // CORS Configuration
   app.use(cors({
-    origin: [env.CLIENT_URL, 'http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: (origin, callback) => {
+      // In development or local Wi-Fi testing, allow local IP access (e.g. 192.168.x.x)
+      if (!origin) return callback(null, true);
+      const isAllowed =
+        origin === env.CLIENT_URL ||
+        /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/.test(origin);
+      if (isAllowed || env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
