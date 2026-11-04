@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Truck, ShieldCheck, Tag, Sparkles, X, IndianRupee, ShoppingBag } from 'lucide-react';
+import { Search, Truck, ShieldCheck, Tag, Sparkles, X, IndianRupee, ShoppingBag, PackageSearch } from 'lucide-react';
 import { Product } from '@/data/mockData';
 
 interface HeroSectionProps {
@@ -136,75 +136,97 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               </form>
 
               {/* Live Instant Suggestions Dropdown */}
-              {showDropdown && matchingSuggestions.length > 0 && (
+              {showDropdown && query.trim().length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150 overflow-hidden">
-                  <div className="px-3.5 py-1.5 border-b border-slate-50 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      Quick Suggestions ({matchingSuggestions.length})
-                    </span>
-                    <span className="text-[11px] text-emerald-700 font-semibold">
-                      Press Enter to view all
-                    </span>
-                  </div>
-
-                  <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
-                    {matchingSuggestions.map((prod) => (
-                      <div
-                        key={prod.id}
-                        className="flex items-center justify-between p-2.5 px-3.5 hover:bg-emerald-50/60 transition-colors cursor-pointer group"
-                        onClick={() => handleSuggestionClick(prod.name)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={prod.image}
-                            alt={prod.name}
-                            className="w-10 h-10 rounded-xl object-cover bg-slate-50"
-                          />
-                          <div>
-                            <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-800 transition-colors">
-                              {prod.name}
-                            </p>
-                            <p className="text-[10px] text-slate-400">
-                              {prod.category} • {prod.unit}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-slate-900 flex items-center">
-                            <IndianRupee className="w-3.5 h-3.5 stroke-[2.5]" />
-                            {prod.price}
-                          </span>
-                          {onAddToCart && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onAddToCart(prod);
-                              }}
-                              className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-                            >
-                              <ShoppingBag className="w-3 h-3" />
-                              <span>Add</span>
-                            </button>
-                          )}
-                        </div>
+                  {matchingSuggestions.length > 0 ? (
+                    <>
+                      <div className="px-3.5 py-1.5 border-b border-slate-50 flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                          Quick Suggestions ({matchingSuggestions.length})
+                        </span>
+                        <span className="text-[11px] text-emerald-700 font-semibold">
+                          Press Enter to view all
+                        </span>
                       </div>
-                    ))}
-                  </div>
 
-                  <div className="p-2 border-t border-slate-50 bg-slate-50/50">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDropdown(false);
-                        onSearch?.(query.trim());
-                      }}
-                      className="w-full text-center text-xs font-bold text-emerald-700 hover:text-emerald-800 py-1 cursor-pointer"
-                    >
-                      View all matching results for &ldquo;{query}&rdquo; &rarr;
-                    </button>
-                  </div>
+                      <div className="divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                        {matchingSuggestions.map((prod) => (
+                          <div
+                            key={prod.id}
+                            className="flex items-center justify-between p-2.5 px-3.5 hover:bg-emerald-50/60 transition-colors cursor-pointer group"
+                            onClick={() => handleSuggestionClick(prod.name)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <img
+                                src={prod.image}
+                                alt={prod.name}
+                                className="w-10 h-10 rounded-xl object-cover bg-slate-50"
+                              />
+                              <div>
+                                <p className="text-xs font-bold text-slate-900 group-hover:text-emerald-800 transition-colors">
+                                  {prod.name}
+                                </p>
+                                <p className="text-[10px] text-slate-400">
+                                  {prod.category} • {prod.unit}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-slate-900 flex items-center">
+                                <IndianRupee className="w-3.5 h-3.5 stroke-[2.5]" />
+                                {prod.price}
+                              </span>
+                              {onAddToCart && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onAddToCart(prod);
+                                  }}
+                                  className="px-2.5 py-1 text-[11px] font-bold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
+                                >
+                                  <ShoppingBag className="w-3 h-3" />
+                                  <span>Add</span>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="p-2 border-t border-slate-50 bg-slate-50/50">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowDropdown(false);
+                            onSearch?.(query.trim());
+                          }}
+                          className="w-full text-center text-xs font-bold text-emerald-700 hover:text-emerald-800 py-1 cursor-pointer"
+                        >
+                          View all matching results for &ldquo;{query}&rdquo; &rarr;
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="p-4 text-center space-y-2">
+                      <div className="w-9 h-9 rounded-full bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center mx-auto">
+                        <PackageSearch className="w-4.5 h-4.5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                          Not available right now
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 pt-1">
+                          &ldquo;{query}&rdquo; is not available right now
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          This product is currently out of stock or not listed in nearby stores.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

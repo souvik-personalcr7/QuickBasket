@@ -13,8 +13,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAdded, setIsAdded] = useState(false);
 
+  const isOutOfStock = typeof product.stock === 'number' && product.stock <= 0;
+
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (isOutOfStock) return;
     setIsAdded(true);
     onAddToCart?.(product);
     setTimeout(() => {
@@ -25,6 +28,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
   return (
     <div className="group relative w-full bg-white rounded-2xl border border-slate-100/80 p-2 sm:p-2.5 flex flex-col justify-between shadow-[0_2px_8px_-2px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_20px_-4px_rgba(21,128,61,0.12)] hover:border-emerald-200 transition-all duration-200">
       
+      {/* Out of stock badge */}
+      {isOutOfStock && (
+        <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+          Not available right now
+        </span>
+      )}
+
       {/* Wishlist Button: Compact top-right badge */}
       <button
         type="button"
@@ -86,13 +96,18 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
       <button
         type="button"
         onClick={handleAdd}
-        className={`w-full mt-2 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all duration-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-1 cursor-pointer ${
-          isAdded
-            ? 'bg-emerald-700 text-white'
-            : 'bg-[#135d38] hover:bg-[#0f4e2e] text-white active:scale-98'
+        disabled={isOutOfStock}
+        className={`w-full mt-2 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all duration-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-1 ${
+          isOutOfStock
+            ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+            : isAdded
+            ? 'bg-emerald-700 text-white cursor-pointer'
+            : 'bg-[#135d38] hover:bg-[#0f4e2e] text-white active:scale-98 cursor-pointer'
         }`}
       >
-        {isAdded ? (
+        {isOutOfStock ? (
+          <span>Not Available</span>
+        ) : isAdded ? (
           <>
             <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
             <span>Added</span>

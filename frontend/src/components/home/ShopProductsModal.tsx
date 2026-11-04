@@ -231,18 +231,28 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
             </div>
           ) : (
             <div className="p-12 text-center flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/70 flex items-center justify-center">
                 <Package className="w-7 h-7" />
               </div>
+              {searchQuery && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Not available right now
+                </div>
+              )}
               <h3 className="text-base font-extrabold text-slate-900">
                 {products.length === 0
                   ? 'No Products Added Yet'
+                  : searchQuery
+                  ? `"${searchQuery}" is not available right now`
                   : 'No Matching Products'}
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
                 {products.length === 0
                   ? `The owner of ${shop.name} hasn't added any products to their store catalog yet. When they list products, they will automatically appear here!`
-                  : `No products matched "${searchQuery}". Try searching for another item or clear your filter.`}
+                  : searchQuery
+                  ? `This item is currently not available in ${shop.name}. Try searching for another product or clear your search.`
+                  : 'Try selecting a different category filter or clear your selection.'}
               </p>
               {searchQuery && (
                 <button

@@ -21,8 +21,8 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
   return (
     <section id="featured-products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-6">
+        <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-extrabold text-[#0f3d23] tracking-tight">
             Featured Products
           </h2>
@@ -35,7 +35,7 @@ export const FeaturedProductsSection: React.FC<FeaturedProductsSectionProps> = (
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs sm:text-sm font-bold text-[#15803d] hover:text-[#166534] flex items-center gap-1 transition-colors cursor-pointer group"
+            className="text-xs sm:text-sm font-bold text-[#15803d] hover:text-[#166534] flex items-center gap-1 transition-colors cursor-pointer group whitespace-nowrap shrink-0"
           >
             <span>{isExpanded ? 'Show Less' : 'View All'}</span>
             <span className="text-base group-hover:translate-x-0.5 transition-transform">

@@ -19,8 +19,8 @@ export const CategorySection: React.FC<CategorySectionProps> = ({ onSelectCatego
   return (
     <section id="categories" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Section Header */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
+      <div className="flex items-center justify-between gap-3 mb-4 sm:mb-6">
+        <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-extrabold text-[#0f3d23] tracking-tight">
             Shop by Category
           </h2>
@@ -33,7 +33,7 @@ export const CategorySection: React.FC<CategorySectionProps> = ({ onSelectCatego
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="text-xs sm:text-sm font-bold text-[#15803d] hover:text-[#166534] flex items-center gap-1 transition-colors cursor-pointer group"
+          className="text-xs sm:text-sm font-bold text-[#15803d] hover:text-[#166534] flex items-center gap-1 transition-colors cursor-pointer group whitespace-nowrap shrink-0"
           aria-label="View all categories"
         >
           <span>View All</span>
