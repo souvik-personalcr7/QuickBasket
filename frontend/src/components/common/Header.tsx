@@ -422,46 +422,25 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   </Link>
                 </nav>
               ) : (
-                <>
-                  <nav className="mt-4 space-y-2">
-                    {navLinks.map((link) => (
-                      <Link
-                        key={link.name}
-                        href={link.href}
-                        onClick={() => {
-                          setActiveNav(link.name);
-                          setMobileMenuOpen(false);
-                        }}
-                        className={`block px-3 py-2 text-base font-semibold rounded-lg ${
-                          activeNav === link.name
-                            ? 'bg-emerald-50 text-[#15803d]'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {link.name}
-                      </Link>
-                    ))}
-                  </nav>
-
-                  <div className="mt-6 pt-4 border-t border-slate-100 space-y-2">
+                <nav className="mt-4 space-y-2">
+                  {navLinks.map((link) => (
                     <Link
-                      href="/shop"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
+                      key={link.name}
+                      href={link.href}
+                      onClick={() => {
+                        setActiveNav(link.name);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`block px-3 py-2 text-base font-semibold rounded-lg ${
+                        activeNav === link.name
+                          ? 'bg-emerald-50 text-[#15803d]'
+                          : 'text-slate-700 hover:bg-slate-50'
+                      }`}
                     >
-                      <Store className="w-4 h-4 text-emerald-600" />
-                      <span>Shop Owner Portal</span>
+                      {link.name}
                     </Link>
-                    <Link
-                      href="/delivery"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-700 hover:text-[#15803d]"
-                    >
-                      <Bike className="w-4 h-4 text-emerald-600" />
-                      <span>Delivery Partner App</span>
-                    </Link>
-                  </div>
-                </>
+                  ))}
+                </nav>
               )}
             </div>
 
