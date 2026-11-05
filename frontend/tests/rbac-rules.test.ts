@@ -82,7 +82,11 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       assert.equal(evaluateRouteAccess('/addresses', shopOwnerSession).action, 'allow');
     });
 
-    test('Shop Owner CANNOT access Customer-only routes and is redirected to /shop', () => {
+    test('Shop Owner CANNOT access Customer-only routes or Customer home (/) and is redirected to /shop', () => {
+      const homeRes = evaluateRouteAccess('/', shopOwnerSession);
+      assert.equal(homeRes.action, 'redirect');
+      assert.equal(homeRes.targetUrl, '/shop');
+
       const cartRes = evaluateRouteAccess('/cart', shopOwnerSession);
       assert.equal(cartRes.action, 'redirect');
       assert.equal(cartRes.targetUrl, '/shop');
@@ -116,7 +120,11 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       assert.equal(evaluateRouteAccess('/addresses', deliverySession).action, 'allow');
     });
 
-    test('Delivery Partner CANNOT access Customer-only routes and is redirected to /delivery', () => {
+    test('Delivery Partner CANNOT access Customer-only routes or Customer home (/) and is redirected to /delivery', () => {
+      const homeRes = evaluateRouteAccess('/', deliverySession);
+      assert.equal(homeRes.action, 'redirect');
+      assert.equal(homeRes.targetUrl, '/delivery');
+
       const cartRes = evaluateRouteAccess('/cart', deliverySession);
       assert.equal(cartRes.action, 'redirect');
       assert.equal(cartRes.targetUrl, '/delivery');

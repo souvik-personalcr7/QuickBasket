@@ -135,7 +135,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await apiClient('/auth/logout', { method: 'POST' });
     } finally {
       if (typeof document !== 'undefined') {
-        document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax';
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0; SameSite=Lax; Secure';
       }
       setUser(null);
       router.push('/login');

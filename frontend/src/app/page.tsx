@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Search, X, PackageSearch, Store, ArrowRight } from 'lucide-react';
 import { HeroSection } from '@/components/home/HeroSection';
 import { CategorySection } from '@/components/home/CategorySection';
@@ -16,9 +17,23 @@ import { Product, Shop } from '@/data/mockData';
 import { getStoredShopImage } from '@/lib/imageUtils';
 
 export default function CustomerHomePage() {
+  const router = useRouter();
   const { addToCart } = useCart();
-  const { user } = useAuth();
+  const { user, role, isLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Route protection: Non-customers must never see the customer homepage
+  useEffect(() => {
+    if (!isLoading && role) {
+      if (role === 'shop_owner') {
+        router.replace('/shop');
+      } else if (role === 'delivery_partner') {
+        router.replace('/delivery');
+      } else if (role === 'admin') {
+        router.replace('/admin');
+      }
+    }
+  }, [isLoading, role, router]);
   
   // Real dynamic data added by shop owners ONLY — zero dummy products or dummy shops
   const [allProducts, setAllProducts] = useState<Product[]>([]);
@@ -331,6 +346,15 @@ export default function CustomerHomePage() {
   }, [searchQuery, allProducts]);
 
   const isSearchActive = searchQuery.trim().length > 0;
+
+  // Prevent flash of customer layout for non-customer roles before client redirect
+  if (role && role !== 'customer') {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 pb-12">

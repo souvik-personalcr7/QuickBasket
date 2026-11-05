@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -95,9 +96,13 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
     }
   };
 
+  const pathname = usePathname();
+  const isShopInterface = pathname === '/shop' || (pathname ? pathname.startsWith('/shop/') : false);
+  const isDeliveryInterface = pathname === '/delivery' || (pathname ? pathname.startsWith('/delivery/') : false);
+
   const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
   const isShopOwner = mounted && isAuthenticated && role === 'shop_owner';
-  const isStaffPortal = isDeliveryPartner || isShopOwner;
+  const isStaffPortal = (isDeliveryPartner && isDeliveryInterface) || (isShopOwner && isShopInterface);
 
   return (
     <>
@@ -139,23 +144,23 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 </div>
               </Link>
 
-              {isDeliveryPartner && (
+              {isDeliveryPartner && isDeliveryInterface && (
                 <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <Bike className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Rider Mode</span>
+                  <span>Rider</span>
                 </span>
               )}
 
-              {isShopOwner && (
+              {isShopOwner && isShopInterface && (
                 <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <Store className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Merchant Mode</span>
+                  <span>Merchant</span>
                 </span>
               )}
             </div>
 
             {/* Desktop Navigation Links: Delivery vs Shop Owner vs Customer */}
-            {isDeliveryPartner ? (
+            {isDeliveryPartner && isDeliveryInterface ? (
               <nav className="hidden md:flex items-center gap-4">
                 <Link
                   href="/delivery"
@@ -172,7 +177,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   <span>Rider Details</span>
                 </Link>
               </nav>
-            ) : isShopOwner ? (
+            ) : isShopOwner && isShopInterface ? (
               <nav className="hidden md:flex items-center gap-4">
                 <Link
                   href="/shop"
@@ -395,7 +400,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
               )}
 
               {/* Mobile Links: Delivery vs Shop Owner vs Customer */}
-              {isDeliveryPartner ? (
+              {isDeliveryPartner && isDeliveryInterface ? (
                 <nav className="mt-4 space-y-2">
                   <Link
                     href="/delivery"
@@ -414,7 +419,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                     <span>Rider Fleet Profile</span>
                   </Link>
                 </nav>
-              ) : isShopOwner ? (
+              ) : isShopOwner && isShopInterface ? (
                 <nav className="mt-4 space-y-2">
                   <Link
                     href="/shop"

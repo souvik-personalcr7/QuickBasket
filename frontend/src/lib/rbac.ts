@@ -185,11 +185,11 @@ export function evaluateRouteAccess(
 
   // --- SHOP OWNER ---
   if (role === 'shop_owner') {
-    if (isCustomerOnlyRoute(normPath)) {
+    if (isCustomerOnlyRoute(normPath) || normPath === '/') {
       return {
         action: 'redirect',
         targetUrl: '/shop',
-        reason: 'Shop Owner is not allowed to access Customer-only protected routes',
+        reason: 'Shop Owner is not allowed to access Customer routes',
       };
     }
     if (isDeliveryRoute(normPath)) {
@@ -211,11 +211,11 @@ export function evaluateRouteAccess(
 
   // --- DELIVERY PARTNER ---
   if (role === 'delivery_partner') {
-    if (isCustomerOnlyRoute(normPath)) {
+    if (isCustomerOnlyRoute(normPath) || normPath === '/') {
       return {
         action: 'redirect',
         targetUrl: '/delivery',
-        reason: 'Delivery Partner is not allowed to access Customer-only protected routes',
+        reason: 'Delivery Partner is not allowed to access Customer routes',
       };
     }
     if (isShopRoute(normPath)) {
@@ -237,11 +237,11 @@ export function evaluateRouteAccess(
 
   // --- ADMIN ---
   if (role === 'admin') {
-    if (isShopRoute(normPath) || isDeliveryRoute(normPath) || isCustomerOnlyRoute(normPath)) {
+    if (isShopRoute(normPath) || isDeliveryRoute(normPath) || isCustomerOnlyRoute(normPath) || normPath === '/') {
       return {
         action: 'redirect',
         targetUrl: '/admin',
-        reason: 'Admin is isolated from operational portal pages',
+        reason: 'Admin is isolated from operational portal pages and customer home',
       };
     }
     return { action: 'allow' };

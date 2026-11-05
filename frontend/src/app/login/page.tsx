@@ -53,6 +53,10 @@ function LoginForm() {
     if (isAuthenticated && currentRole) {
       const redirectParam = searchParams.get('redirect');
       if (redirectParam && redirectParam.startsWith('/')) {
+        if (redirectParam === '/' && currentRole !== 'customer') {
+          router.replace(getRoleRedirectPath(currentRole));
+          return;
+        }
         const evalRes = evaluateRouteAccess(redirectParam, { id: '', role: currentRole, email: '' });
         if (evalRes.action === 'allow') {
           router.replace(redirectParam);
@@ -104,6 +108,10 @@ function LoginForm() {
       if (res.success && res.role) {
         const redirectParam = searchParams.get('redirect');
         if (redirectParam && redirectParam.startsWith('/')) {
+          if (redirectParam === '/' && res.role !== 'customer') {
+            router.push(getRoleRedirectPath(res.role));
+            return;
+          }
           const evalRes = evaluateRouteAccess(redirectParam, { id: '', role: res.role, email: '' });
           if (evalRes.action === 'allow') {
             router.push(redirectParam);

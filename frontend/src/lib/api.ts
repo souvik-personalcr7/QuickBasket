@@ -26,8 +26,17 @@ export async function apiClient<T>(
   const baseUrl = getApiBaseUrl();
   const url = `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 
+  let authHeader: Record<string, string> = {};
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
+    if (match && match[1]) {
+      authHeader = { Authorization: `Bearer ${match[1]}` };
+    }
+  }
+
   const headers = {
     'Content-Type': 'application/json',
+    ...authHeader,
     ...(options.headers || {}),
   };
 
