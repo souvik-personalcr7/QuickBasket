@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, UserRole, LoginCredentials, RegisterCredentials } from '@/types/auth';
+import { User, UserRole, UserAddress, ShopDetails, LoginCredentials, RegisterCredentials } from '@/types/auth';
 import { apiClient } from '@/lib/api';
 
 interface AuthContextType {
@@ -13,6 +13,9 @@ interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
   register: (credentials: RegisterCredentials) => Promise<{ success: boolean; message?: string; role?: UserRole }>;
   logout: () => Promise<void>;
+  updateUserAddress: (address: UserAddress) => Promise<{ success: boolean; message?: string }>;
+  updateShopDetails: (details: Partial<ShopDetails>) => Promise<{ success: boolean; message?: string }>;
+  refreshUser: () => Promise<void>;
   getRoleRedirectPath: (role: UserRole) => string;
 }
 
@@ -67,6 +70,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.success && response.data?.user) {
         const loggedUser = response.data.user;
         setUser(loggedUser);
+
+        // Ensure token cookie is set for Next.js server-side middleware
+        if (typeof document !== 'undefined' && response.data?.token) {
+          const isSecure = window.location.protocol === 'https:';
+          document.cookie = `token=${response.data.token}; path=/; max-age=31536000; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+        }
+
         return {
           success: true,
           role: loggedUser.role,
@@ -95,6 +105,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.success && response.data?.user) {
         const newUser = response.data.user;
         setUser(newUser);
+
+        // Ensure token cookie is set for Next.js server-side middleware
+        if (typeof document !== 'undefined' && response.data?.token) {
+          const isSecure = window.location.protocol === 'https:';
+          document.cookie = `token=${response.data.token}; path=/; max-age=31536000; SameSite=Lax${isSecure ? '; Secure' : ''}`;
+        }
+
         return {
           success: true,
           role: newUser.role,
@@ -117,8 +134,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await apiClient('/auth/logout', { method: 'POST' });
     } finally {
+      if (typeof document !== 'undefined') {
+        document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+      }
       setUser(null);
       router.push('/login');
+    }
+  };
+
+  const updateUserAddress = async (
+    address: UserAddress
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await apiClient<{ user: User }>('/auth/address', {
+        method: 'PATCH',
+        body: JSON.stringify(address),
+      });
+
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        return { success: true, message: response.message || 'Primary address updated successfully' };
+      }
+
+      // Guest / local fallback if user is logged in locally
+      if (user) {
+        setUser({ ...user, address });
+        return { success: true, message: 'Primary address updated' };
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Failed to update address',
+      };
+    } catch (err) {
+      if (user) {
+        setUser({ ...user, address });
+        return { success: true, message: 'Primary address updated' };
+      }
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Network error updating address',
+      };
+    }
+  };
+
+  const updateShopDetails = async (
+    details: Partial<ShopDetails>
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await apiClient<{ user: User }>('/auth/shop-details', {
+        method: 'PATCH',
+        body: JSON.stringify(details),
+      });
+
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        return { success: true, message: response.message || 'Storefront details updated successfully' };
+      }
+
+      // Guest / local fallback
+      if (user) {
+        const updatedShop = { ...(user.shopDetails || {}), ...details };
+        setUser({ ...user, shopDetails: updatedShop });
+        return { success: true, message: 'Storefront details updated' };
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Failed to update storefront details',
+      };
+    } catch (err) {
+      if (user) {
+        const updatedShop = { ...(user.shopDetails || {}), ...details };
+        setUser({ ...user, shopDetails: updatedShop });
+        return { success: true, message: 'Storefront details updated' };
+      }
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Network error updating storefront details',
+      };
     }
   };
 
@@ -132,6 +226,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUserAddress,
+        updateShopDetails,
+        refreshUser,
         getRoleRedirectPath,
       }}
     >

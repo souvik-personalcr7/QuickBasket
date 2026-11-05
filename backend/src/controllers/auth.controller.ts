@@ -2,18 +2,27 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { User, IUser } from '../models/User';
-import { registerSchema, loginSchema } from '../validators/auth.validator';
+import { registerSchema, loginSchema, updateAddressSchema, updateShopDetailsSchema } from '../validators/auth.validator';
 import { AppError } from '../utils/appError';
 import { sendResponse } from '../utils/apiResponse';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 // Helper to sign JWT
-const signToken = (user: IUser): string => {
+export const signToken = (user: IUser): string => {
+  const isApproved =
+    user.role === 'shop_owner'
+      ? Boolean(user.shopDetails?.isApproved)
+      : user.role === 'delivery_partner'
+      ? Boolean(user.deliveryDetails?.isApproved ?? true)
+      : true;
+
   return jwt.sign(
     {
       id: user._id,
       role: user.role,
       email: user.email,
+      isActive: user.isActive,
+      isApproved,
     },
     env.JWT_SECRET,
     {
@@ -177,6 +186,104 @@ export const logout = async (_req: Request, res: Response, next: NextFunction): 
       statusCode: 200,
       message: 'Logged out successfully',
       data: null,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateAddress = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const parsed = updateAddressSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues.map((i) => i.message).join(', ');
+      throw new AppError(errorMsg, 400);
+    }
+
+    const { street, city, state, postalCode } = parsed.data;
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    user.address = {
+      street: street !== undefined ? street.trim() : (user.address?.street || ''),
+      city: city !== undefined ? city.trim() : (user.address?.city || ''),
+      state: state !== undefined ? state.trim() : (user.address?.state || ''),
+      postalCode: postalCode !== undefined ? postalCode.trim() : (user.address?.postalCode || ''),
+    };
+
+    await user.save();
+    user.password = undefined;
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: 'Primary address updated successfully',
+      data: {
+        user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateShopDetails = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    if (!req.user) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    if (req.user.role !== 'shop_owner' && req.user.role !== 'admin') {
+      throw new AppError('Access denied. Only shop owners can manage storefront details.', 403);
+    }
+
+    if (!req.user.isActive) {
+      throw new AppError('This account has been deactivated or suspended.', 403);
+    }
+
+    const parsed = updateShopDetailsSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues.map((i) => i.message).join(', ');
+      throw new AppError(errorMsg, 400);
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    const current = user.shopDetails || {};
+    user.shopDetails = {
+      shopName: parsed.data.shopName !== undefined ? parsed.data.shopName.trim() : (current.shopName || ''),
+      category: parsed.data.category !== undefined ? parsed.data.category.trim() : (current.category || 'General Store'),
+      address: parsed.data.address !== undefined ? parsed.data.address.trim() : (current.address || ''),
+      image: parsed.data.image !== undefined ? parsed.data.image.trim() : (current.image || ''),
+      isApproved: current.isApproved !== undefined ? current.isApproved : false,
+    };
+
+    await user.save();
+    user.password = undefined;
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: 'Storefront details updated successfully',
+      data: {
+        user,
+      },
     });
   } catch (error) {
     next(error);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { register, login, getMe, logout } from '../controllers/auth.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { register, login, getMe, logout, updateAddress, updateShopDetails } from '../controllers/auth.controller';
+import { authenticate, authorize } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -11,5 +11,7 @@ router.post('/logout', logout);
 
 // Protected routes
 router.get('/me', authenticate, getMe);
+router.patch('/address', authenticate, updateAddress);
+router.patch('/shop-details', authenticate, authorize('shop_owner', 'admin'), updateShopDetails);
 
 export const authRoutes = router;

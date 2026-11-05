@@ -13,6 +13,7 @@ import { ShopProductsModal } from '@/components/home/ShopProductsModal';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { Product, Shop } from '@/data/mockData';
+import { getStoredShopImage } from '@/lib/imageUtils';
 
 export default function CustomerHomePage() {
   const { addToCart } = useCart();
@@ -26,6 +27,28 @@ export default function CustomerHomePage() {
   // Selected shop state (when user clicks a shop in "Popular Shops Near You")
   const [selectedShop, setSelectedShop] = useState<Shop | null>(null);
   const [isShopModalOpen, setIsShopModalOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Listen to custom shop updates from shop owner portal or localStorage changes
+  useEffect(() => {
+    const handleUpdate = () => setRefreshTrigger((prev) => prev + 1);
+    window.addEventListener('qb_shop_details_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('qb_shop_details_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  // Keep open selected shop image synchronized in real time
+  useEffect(() => {
+    if (selectedShop) {
+      const latestImg = getStoredShopImage(selectedShop);
+      if (latestImg && latestImg !== selectedShop.image) {
+        setSelectedShop((prev) => (prev ? { ...prev, image: latestImg } : null));
+      }
+    }
+  }, [refreshTrigger]);
 
   // Load real products & shops from shop owners
   useEffect(() => {
@@ -67,7 +90,7 @@ export default function CustomerHomePage() {
 
       // 2. Gather all registered shops added by shop owners
       const loadedShops: Shop[] = [];
-      const seenShopIds = new Set<string>();
+      const shopMap = new Map<string, any>();
 
       // Check qb_registered_shops registry
       const rawShops = localStorage.getItem('qb_registered_shops');
@@ -75,43 +98,92 @@ export default function CustomerHomePage() {
         const parsedShops = JSON.parse(rawShops);
         if (Array.isArray(parsedShops)) {
           for (const s of parsedShops) {
-            if (s && s.id && !seenShopIds.has(s.id)) {
-              seenShopIds.add(s.id);
-              loadedShops.push({
-                id: s.id,
-                name: s.name,
-                category: s.category || 'Retail & Grocery',
-                rating: s.rating || 4.8,
-                reviewCount: s.reviewCount || 'Verified Store',
-                deliveryTime: s.deliveryTime || '20-30 mins',
-                isFreeDelivery: s.isFreeDelivery ?? true,
-                image: s.image || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=350&auto=format&fit=crop&q=80',
-                address: s.address,
-                ownerId: s.ownerId,
-                ownerEmail: s.ownerEmail,
-                isOpen: s.isOpen,
-                productCount: s.productCount,
-                products: s.products,
-              });
+            if (!s) continue;
+            // Group and deduplicate by normalized shop name or id
+            const normKey = (s.name || s.id || '').trim().toLowerCase();
+            if (!normKey) continue;
+
+            const existing = shopMap.get(normKey);
+            if (!existing) {
+              shopMap.set(normKey, s);
+            } else {
+              // Prefer the entry with a custom non-default image or richer data
+              const existingHasCustom = existing.image && !existing.image.includes('photo-1578916171728-46686eac8d58');
+              const currentHasCustom = s.image && !s.image.includes('photo-1578916171728-46686eac8d58');
+              if (!existingHasCustom && currentHasCustom) {
+                shopMap.set(normKey, { ...existing, ...s });
+              } else {
+                shopMap.set(normKey, { ...s, ...existing });
+              }
             }
+          }
+
+          for (const s of Array.from(shopMap.values())) {
+            const isOwner = user && (
+              (user.id && s.ownerId && user.id === s.ownerId) ||
+              (user.email && s.ownerEmail && user.email.toLowerCase() === s.ownerEmail.toLowerCase()) ||
+              (user.shopDetails?.shopName && s.name && user.shopDetails.shopName.toLowerCase().trim() === s.name.toLowerCase().trim())
+            );
+
+            const resolvedImage =
+              (isOwner && user.shopDetails?.image?.trim()) ||
+              getStoredShopImage({
+                name: s.name,
+                image: s.image,
+                ownerEmail: s.ownerEmail,
+                ownerId: s.ownerId,
+              });
+
+            loadedShops.push({
+              id: s.id,
+              name: (isOwner && user.shopDetails?.shopName?.trim()) || s.name,
+              category: (isOwner && user.shopDetails?.category?.trim()) || s.category || 'Retail & Grocery',
+              rating: s.rating || 4.8,
+              reviewCount: s.reviewCount || 'Verified Store',
+              deliveryTime: s.deliveryTime || '20-30 mins',
+              isFreeDelivery: s.isFreeDelivery ?? true,
+              image: resolvedImage,
+              address: (isOwner && user.shopDetails?.address?.trim()) || s.address,
+              ownerId: s.ownerId,
+              ownerEmail: s.ownerEmail,
+              isOpen: s.isOpen,
+              productCount: s.productCount,
+              products: s.products,
+            });
           }
         }
       }
 
       // If current active user is a shop owner, ensure their shop is registered and listed
       if (user && user.role === 'shop_owner') {
-        const ownerShopId = `shop_${user.id || user.email}`;
-        if (!seenShopIds.has(ownerShopId)) {
-          seenShopIds.add(ownerShopId);
+        const ownerShopName = user.shopDetails?.shopName?.trim() || `${user.name}'s Store`;
+        const alreadyListed = loadedShops.some(
+          (sh) =>
+            sh.name.toLowerCase().trim() === ownerShopName.toLowerCase().trim() ||
+            (user.id && sh.ownerId === user.id) ||
+            (user.email && sh.ownerEmail && sh.ownerEmail.toLowerCase() === user.email.toLowerCase())
+        );
+
+        if (!alreadyListed) {
+          const ownerShopId = `shop_${user.id || user.email}`;
+          const resolvedOwnerImage =
+            user.shopDetails?.image?.trim() ||
+            getStoredShopImage({
+              name: ownerShopName,
+              image: user.shopDetails?.image,
+              ownerEmail: user.email,
+              ownerId: user.id,
+            });
+
           loadedShops.push({
             id: ownerShopId,
-            name: user.shopDetails?.shopName?.trim() || `${user.name}'s Store`,
+            name: ownerShopName,
             category: user.shopDetails?.category?.trim() || 'Retail & Grocery',
             rating: 4.9,
             reviewCount: 'Owner Verified',
             deliveryTime: '15-30 mins',
             isFreeDelivery: true,
-            image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=350&auto=format&fit=crop&q=80',
+            image: resolvedOwnerImage,
             address: user.shopDetails?.address?.trim() || user.address?.street?.trim(),
             ownerId: user.id,
             ownerEmail: user.email,
@@ -127,7 +199,7 @@ export default function CustomerHomePage() {
       setAllProducts([]);
       setAllShops([]);
     }
-  }, [user]);
+  }, [user, refreshTrigger]);
 
   const handleAddToCart = (product: Product) => {
     addToCart(product);
@@ -162,7 +234,8 @@ export default function CustomerHomePage() {
 
   // When clicking on a shop in Popular Shops Near You
   const handleSelectShop = (shop: Shop) => {
-    setSelectedShop(shop);
+    const latestImg = getStoredShopImage(shop);
+    setSelectedShop({ ...shop, image: latestImg });
     setIsShopModalOpen(true);
     setTimeout(() => {
       document.getElementById('shop-showcase')?.scrollIntoView({ behavior: 'smooth' });
@@ -386,7 +459,7 @@ export default function CustomerHomePage() {
               <div className="flex items-center gap-3.5">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-white border border-slate-200 shrink-0 shadow-2xs">
                   <img
-                    src={selectedShop.image}
+                    src={getStoredShopImage(selectedShop)}
                     alt={selectedShop.name}
                     className="w-full h-full object-cover"
                   />

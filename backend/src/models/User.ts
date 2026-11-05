@@ -14,6 +14,7 @@ export interface IShopDetails {
   shopName?: string;
   category?: string;
   address?: string;
+  image?: string;
   isApproved?: boolean;
 }
 
@@ -22,6 +23,7 @@ export interface IDeliveryDetails {
   vehicleNumber?: string;
   isAvailable?: boolean;
   city?: string;
+  isApproved?: boolean;
 }
 
 export interface IUser extends Document {
@@ -92,6 +94,7 @@ const UserSchema = new Schema<IUser>(
       shopName: { type: String, trim: true, default: '' },
       category: { type: String, trim: true, default: '' },
       address: { type: String, trim: true, default: '' },
+      image: { type: String, trim: true, default: '' },
       isApproved: { type: Boolean, default: false },
     },
     deliveryDetails: {
@@ -99,6 +102,7 @@ const UserSchema = new Schema<IUser>(
       vehicleNumber: { type: String, trim: true, default: '' },
       isAvailable: { type: Boolean, default: true },
       city: { type: String, trim: true, default: '' },
+      isApproved: { type: Boolean, default: false },
     },
     isActive: {
       type: Boolean,

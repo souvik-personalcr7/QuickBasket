@@ -11,6 +11,7 @@ export interface ShopDetails {
   shopName?: string;
   category?: string;
   address?: string;
+  image?: string;
   isApproved?: boolean;
 }
 
@@ -19,6 +20,7 @@ export interface DeliveryDetails {
   vehicleNumber?: string;
   isAvailable?: boolean;
   city?: string;
+  isApproved?: boolean;
 }
 
 export interface User {

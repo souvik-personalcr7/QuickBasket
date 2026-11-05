@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { UserRole } from '@/types/auth';
+import { evaluateRouteAccess } from '@/lib/rbac';
 
 function LoginForm() {
   const router = useRouter();
@@ -33,20 +34,34 @@ function LoginForm() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync role from query parameters if present
+  // Sync role or errors from query parameters if present
   useEffect(() => {
     const roleParam = searchParams.get('role');
     if (roleParam === 'customer' || roleParam === 'shop_owner' || roleParam === 'delivery_partner') {
       setSelectedRole(roleParam as UserRole);
     }
+    const errorParam = searchParams.get('error');
+    if (errorParam === 'session_expired') {
+      setErrorMsg('Your session has expired. Please log in again to continue.');
+    } else if (errorParam === 'account_deactivated') {
+      setErrorMsg('This account has been deactivated or suspended. Please contact support.');
+    }
   }, [searchParams]);
 
-  // If already logged in, redirect to destination
+  // If already logged in, redirect to destination safely
   useEffect(() => {
     if (isAuthenticated && currentRole) {
-      router.push(getRoleRedirectPath(currentRole));
+      const redirectParam = searchParams.get('redirect');
+      if (redirectParam && redirectParam.startsWith('/')) {
+        const evalRes = evaluateRouteAccess(redirectParam, { id: '', role: currentRole, email: '' });
+        if (evalRes.action === 'allow') {
+          router.replace(redirectParam);
+          return;
+        }
+      }
+      router.replace(getRoleRedirectPath(currentRole));
     }
-  }, [isAuthenticated, currentRole, router, getRoleRedirectPath]);
+  }, [isAuthenticated, currentRole, router, getRoleRedirectPath, searchParams]);
 
   // Quick Demo fill credentials
   const fillDemoCredentials = (role: UserRole) => {
@@ -87,6 +102,14 @@ function LoginForm() {
       });
 
       if (res.success && res.role) {
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam && redirectParam.startsWith('/')) {
+          const evalRes = evaluateRouteAccess(redirectParam, { id: '', role: res.role, email: '' });
+          if (evalRes.action === 'allow') {
+            router.push(redirectParam);
+            return;
+          }
+        }
         router.push(getRoleRedirectPath(res.role));
       } else {
         setErrorMsg(res.message || 'Login failed. Please verify your credentials.');

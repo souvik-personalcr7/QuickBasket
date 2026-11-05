@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield } from 'lucide-react';
+import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 interface HeaderProps {
@@ -279,6 +279,18 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                           )}
                           <span>{getRolePortalName(user.role)}</span>
                         </Link>
+
+                        {/* Customer & Shop Owner Addresses Link */}
+                        {(user.role === 'customer' || user.role === 'shop_owner') && (
+                          <Link
+                            href="/addresses"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                          >
+                            <MapPin className="w-4 h-4 text-emerald-600" />
+                            <span>{user.role === 'shop_owner' ? 'Shop Locations' : 'My Addresses'}</span>
+                          </Link>
+                        )}
 
                         <Link
                           href="/profile"

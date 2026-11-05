@@ -20,6 +20,7 @@ export const registerSchema = z.object({
       shopName: z.string().optional(),
       category: z.string().optional(),
       address: z.string().optional(),
+      image: z.string().optional(),
     })
     .optional(),
   deliveryDetails: z
@@ -37,5 +38,21 @@ export const loginSchema = z.object({
   role: z.enum(['customer', 'shop_owner', 'delivery_partner', 'admin']).optional(),
 });
 
+export const updateAddressSchema = z.object({
+  street: z.string().optional(),
+  city: z.string().optional(),
+  postalCode: z.string().optional(),
+  state: z.string().optional(),
+});
+
+export const updateShopDetailsSchema = z.object({
+  shopName: z.string().min(1, 'Shop name cannot be empty').optional(),
+  category: z.string().optional(),
+  address: z.string().optional(),
+  image: z.string().optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateAddressInput = z.infer<typeof updateAddressSchema>;
+export type UpdateShopDetailsInput = z.infer<typeof updateShopDetailsSchema>;

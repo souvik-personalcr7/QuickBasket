@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Bike,
   Navigation,
@@ -37,8 +38,20 @@ export interface DeliveryTrip {
 
 export default function DeliveryPartnerDashboard() {
   const { user, isLoading } = useAuth();
+  const router = useRouter();
   const [isOnDuty, setIsOnDuty] = useState(true);
   const [activeTab, setActiveTab] = useState<'dispatches' | 'history'>('dispatches');
+
+  // Client-side RBAC guard
+  useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        router.replace('/login?redirect=/delivery');
+      } else if (user.role !== 'delivery_partner' && user.role !== 'admin') {
+        router.replace(user.role === 'customer' ? '/' : user.role === 'shop_owner' ? '/shop' : '/');
+      }
+    }
+  }, [isLoading, user, router]);
 
   // Real trips state (persisted per rider in localStorage)
   const [trips, setTrips] = useState<DeliveryTrip[]>([]);
@@ -76,13 +89,15 @@ export default function DeliveryPartnerDashboard() {
     }
   }, [trips, storageKey, isTripsLoaded]);
 
-  if (isLoading) {
+  if (isLoading || !user || (user.role !== 'delivery_partner' && user.role !== 'admin')) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
+
+  const isApproved = user?.deliveryDetails?.isApproved !== false;
 
   // Dynamic rider details from user profile
   const riderName = user?.name || 'Partner Rider';
@@ -143,22 +158,48 @@ export default function DeliveryPartnerDashboard() {
             <span className="text-xs font-medium text-slate-300 mb-2">Rider Availability</span>
             <button
               type="button"
-              onClick={() => setIsOnDuty(!isOnDuty)}
-              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                isOnDuty
-                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
-                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              disabled={!isApproved}
+              onClick={() => isApproved && setIsOnDuty(!isOnDuty)}
+              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                !isApproved
+                  ? 'bg-amber-500/80 text-white cursor-not-allowed opacity-90'
+                  : isOnDuty
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 cursor-pointer'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300 cursor-pointer'
               }`}
             >
               <Power className="w-4 h-4" />
-              <span>{isOnDuty ? 'ONLINE — READY FOR ORDERS' : 'OFFLINE — ON BREAK'}</span>
+              <span>
+                {!isApproved
+                  ? 'VERIFICATION PENDING'
+                  : isOnDuty
+                  ? 'ONLINE — READY FOR ORDERS'
+                  : 'OFFLINE — ON BREAK'}
+              </span>
             </button>
             <span className="text-[10px] text-slate-400 mt-1.5">
-              {isOnDuty ? 'Receiving hyperlocal delivery pings' : 'Paused incoming order dispatches'}
+              {!isApproved
+                ? 'Approval required to accept trips'
+                : isOnDuty
+                ? 'Receiving hyperlocal delivery pings'
+                : 'Paused incoming order dispatches'}
             </span>
           </div>
         </div>
       </div>
+
+      {/* Pending Rider Verification Notice */}
+      {!isApproved && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
+          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5 text-xs">
+            <h4 className="font-extrabold text-sm text-amber-950">Rider Fleet Account Pending Verification</h4>
+            <p className="text-amber-800 leading-relaxed">
+              Your vehicle credentials and partner application are currently under administrative review. Once verified, active dispatches and duty status will unlock automatically.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Dynamic Metrics Row (calculated from actual trip activity) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">

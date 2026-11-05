@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Store,
   Package,
@@ -24,8 +25,14 @@ import {
   Image as ImageIcon,
   Check,
   Video,
+  Edit2,
+  Upload,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { compressImageFile, syncShopImageToStorage, getStoredShopImage } from '@/lib/imageUtils';
 
 export interface ShopProduct {
   id: string;
@@ -75,9 +82,189 @@ const PRESET_IMAGES: Record<string, string> = {
 };
 
 export default function ShopOwnerDashboard() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, updateShopDetails } = useAuth();
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'catalog' | 'orders'>('catalog');
+
+  // Client-side RBAC guard
+  useEffect(() => {
+    if (!isLoading) {
+      if (!user) {
+        router.replace('/login?redirect=/shop');
+      } else if (user.role !== 'shop_owner' && user.role !== 'admin') {
+        router.replace(user.role === 'customer' ? '/' : user.role === 'delivery_partner' ? '/delivery' : '/');
+      }
+    }
+  }, [isLoading, user, router]);
+
+  // Registered Storefront Details Edit State
+  const [isEditingStore, setIsEditingStore] = useState(false);
+  const [storeName, setStoreName] = useState('');
+  const [storeCategory, setStoreCategory] = useState('');
+  const [storeAddress, setStoreAddress] = useState('');
+  const [storeImage, setStoreImage] = useState('');
+  const [localShopImage, setLocalShopImage] = useState<string>('');
+  const [isSavingStore, setIsSavingStore] = useState(false);
+  const [storeError, setStoreError] = useState<string | null>(null);
+  const [storeSuccess, setStoreSuccess] = useState<string | null>(null);
+
+  // Hidden file input ref for top welcome banner image upload
+  const bannerFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize and synchronize active storefront details from user or stored registry
+  useEffect(() => {
+    const activeName =
+      user?.shopDetails?.shopName?.trim() ||
+      (user?.name ? `${user.name}'s Store` : 'My Hyperlocal Store');
+    const existingImg = getStoredShopImage({
+      name: activeName,
+      image: user?.shopDetails?.image,
+      ownerEmail: user?.email,
+      ownerId: user?.id,
+    });
+    if (existingImg && !existingImg.includes('photo-1578916171728-46686eac8d58')) {
+      setLocalShopImage(existingImg);
+    }
+  }, [user?.shopDetails, user?.name, user?.email, user?.id]);
+
+  const handleStartEditStore = () => {
+    const currentName = user?.shopDetails?.shopName || '';
+    setStoreName(currentName);
+    setStoreCategory(user?.shopDetails?.category || 'General Store');
+    setStoreAddress(user?.shopDetails?.address || user?.address?.street || '');
+    setStoreImage(user?.shopDetails?.image || localShopImage || '');
+    setStoreError(null);
+    setStoreSuccess(null);
+    setIsEditingStore(true);
+  };
+
+  const handleCancelEditStore = () => {
+    setIsEditingStore(false);
+    setStoreError(null);
+  };
+
+  const handleStoreImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setStoreError('Please select a valid image file (PNG, JPG, WEBP).');
+      return;
+    }
+
+    try {
+      // Compress and optimize down to ~50-80KB to fit easily in storage and prevent quota issues
+      const compressedDataUrl = await compressImageFile(file, 800, 800, 0.82);
+      if (compressedDataUrl) {
+        setStoreImage(compressedDataUrl);
+        setStoreError(null);
+      }
+    } catch (err) {
+      console.error('Failed to compress store image:', err);
+      setStoreError('Failed to process image file. Please try another image.');
+    }
+  };
+
+  // Immediate upload & save directly from top welcome banner
+  const handleBannerImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setStoreError('Please select a valid image file (PNG, JPG, WEBP).');
+      return;
+    }
+
+    try {
+      const compressed = await compressImageFile(file, 800, 800, 0.82);
+      if (!compressed) return;
+
+      const currentName =
+        user?.shopDetails?.shopName?.trim() ||
+        (user?.name ? `${user.name}'s Store` : 'My Hyperlocal Store');
+      const currentCategory =
+        user?.shopDetails?.category?.trim() || 'Retail & Grocery';
+      const currentAddress =
+        user?.shopDetails?.address?.trim() ||
+        user?.address?.street?.trim() ||
+        'Store address not set';
+
+      setLocalShopImage(compressed);
+      setStoreImage(compressed);
+
+      // 1. Immediately persist across storage & registry
+      syncShopImageToStorage({
+        shopName: currentName,
+        image: compressed,
+        category: currentCategory,
+        address: currentAddress,
+        ownerId: user?.id,
+        ownerEmail: user?.email,
+        isOpen,
+      });
+
+      // 2. Persist to backend
+      await updateShopDetails({
+        shopName: currentName,
+        category: currentCategory,
+        address: currentAddress,
+        image: compressed,
+      });
+
+      setStoreSuccess('Shop storefront image updated and published to customer views!');
+      setTimeout(() => setStoreSuccess(null), 4000);
+    } catch (err) {
+      console.error('Failed to update banner image:', err);
+      setStoreError('Failed to process image file.');
+    }
+  };
+
+  const handleSaveStoreDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!storeName.trim()) {
+      setStoreError('Shop name cannot be empty.');
+      return;
+    }
+
+    setIsSavingStore(true);
+    setStoreError(null);
+
+    const cleanImg = storeImage.trim();
+
+    // 1. Sync to local storage & registered shops immediately
+    syncShopImageToStorage({
+      shopName: storeName.trim(),
+      image: cleanImg,
+      category: storeCategory.trim(),
+      address: storeAddress.trim(),
+      ownerId: user?.id,
+      ownerEmail: user?.email,
+      isOpen: isOpen,
+    });
+    setLocalShopImage(cleanImg);
+
+    // 2. Persist to API
+    const res = await updateShopDetails({
+      shopName: storeName.trim(),
+      category: storeCategory.trim(),
+      address: storeAddress.trim(),
+      image: cleanImg,
+    });
+
+    setIsSavingStore(false);
+
+    if (res.success) {
+      setIsEditingStore(false);
+      setStoreSuccess('Registered storefront details and shop image updated successfully!');
+      setTimeout(() => setStoreSuccess(null), 4000);
+    } else {
+      // Even if backend fails (e.g. offline/guest mode), local changes were already saved
+      setIsEditingStore(false);
+      setStoreSuccess('Storefront details updated locally and published to customer view!');
+      setTimeout(() => setStoreSuccess(null), 4000);
+    }
+  };
 
   // Real shop owner products (persisted in localStorage per store owner)
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -148,55 +335,37 @@ export default function ShopOwnerDashboard() {
   // Sync shop into registered shops list for customer discovery
   useEffect(() => {
     if (user && isProductsLoaded) {
-      try {
-        const raw = localStorage.getItem('qb_registered_shops');
-        const list: any[] = raw ? JSON.parse(raw) : [];
-        const shopId = `shop_${user.id || user.email || 'guest'}`;
-        const existingIdx = list.findIndex(
-          (s) => s.id === shopId || (user.email && s.ownerEmail === user.email)
-        );
+      const currentShopName =
+        user?.shopDetails?.shopName?.trim() ||
+        (user?.name ? `${user.name}'s Store` : 'My Hyperlocal Store');
+      const currentCategory =
+        user?.shopDetails?.category?.trim() || 'Retail & Grocery';
+      const currentAddress =
+        user?.shopDetails?.address?.trim() ||
+        user?.address?.street?.trim() ||
+        'Store address not set';
 
-        const currentShopName =
-          user?.shopDetails?.shopName?.trim() ||
-          (user?.name ? `${user.name}'s Store` : 'My Hyperlocal Store');
-        const currentCategory =
-          user?.shopDetails?.category?.trim() || 'Retail & Grocery';
-        const currentAddress =
-          user?.shopDetails?.address?.trim() ||
-          user?.address?.street?.trim() ||
-          'Store address not set';
-
-        const shopEntry = {
-          id: shopId,
+      const currentImage =
+        user?.shopDetails?.image?.trim() ||
+        localShopImage ||
+        getStoredShopImage({
           name: currentShopName,
-          category: currentCategory,
-          address: currentAddress,
-          ownerId: user.id,
-          ownerName: user.name,
-          ownerEmail: user.email,
-          rating: 4.8,
-          reviewCount: `${products.length} Products`,
-          deliveryTime: '20-30 mins',
-          isFreeDelivery: true,
-          isOpen: isOpen,
-          productCount: products.length,
-          products: products,
-          image:
-            'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=350&auto=format&fit=crop&q=80',
-        };
+          image: user?.shopDetails?.image,
+          ownerEmail: user?.email,
+          ownerId: user?.id,
+        });
 
-        if (existingIdx >= 0) {
-          list[existingIdx] = { ...list[existingIdx], ...shopEntry };
-        } else {
-          list.push(shopEntry);
-        }
-
-        localStorage.setItem('qb_registered_shops', JSON.stringify(list));
-      } catch (err) {
-        console.error('Failed to sync shop registry:', err);
-      }
+      syncShopImageToStorage({
+        shopName: currentShopName,
+        image: currentImage,
+        category: currentCategory,
+        address: currentAddress,
+        ownerId: user.id,
+        ownerEmail: user.email,
+        isOpen,
+      });
     }
-  }, [user, isOpen, products.length, isProductsLoaded]);
+  }, [user, isOpen, products.length, isProductsLoaded, localShopImage]);
 
   // Camera stream handling for desktop/laptop live view (Must be before any early return)
   useEffect(() => {
@@ -274,7 +443,7 @@ export default function ShopOwnerDashboard() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isModalOpen, isLiveCameraOpen]);
 
-  if (isLoading) {
+  if (isLoading || !user || (user.role !== 'shop_owner' && user.role !== 'admin')) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
         <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
@@ -292,6 +461,7 @@ export default function ShopOwnerDashboard() {
     user?.shopDetails?.address?.trim() ||
     user?.address?.street?.trim() ||
     'Store address not set';
+  const shopImage = user?.shopDetails?.image?.trim() || localShopImage;
   const isApproved = Boolean(user?.shopDetails?.isApproved);
 
   // Dynamic metrics computed from actual merchant data
@@ -496,37 +666,72 @@ export default function ShopOwnerDashboard() {
       <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-green-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-radial from-white to-transparent pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3 backdrop-blur-xs">
-              <Store className="w-3.5 h-3.5" />
-              <span>Merchant & Storefront Portal</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Welcome back, {user?.name || 'Partner'}!
-            </h1>
-            <p className="mt-1 text-sm text-emerald-100 max-w-xl">
-              Managing <strong className="text-white">{shopName}</strong> — Keep your store catalog updated and manage incoming neighbor orders in real time.
-            </p>
-            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-emerald-100">
-              <div className="flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5" />
-                <span>{category}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5" />
-                <span>{address}</span>
-              </div>
-              {isApproved ? (
-                <div className="flex items-center gap-1.5 text-emerald-200">
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
-                  <span>Verified Hyperlocal Seller</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+            {/* Shop Image avatar in banner with interactive Change / Add Photo trigger */}
+            <div className="relative group">
+              {shopImage ? (
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/50 shadow-md shrink-0 bg-white">
+                  <img src={shopImage} alt={shopName} className="w-full h-full object-cover" />
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 text-amber-200 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-300/30">
-                  <Clock className="w-3.5 h-3.5 text-amber-300" />
-                  <span>Pending Admin Verification</span>
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border-2 border-dashed border-white/30 flex flex-col items-center justify-center text-emerald-200 shrink-0">
+                  <Store className="w-8 h-8 mb-1" />
+                  <span className="text-[10px] text-white/80 font-bold">No Image</span>
                 </div>
               )}
+              <button
+                type="button"
+                onClick={() => bannerFileInputRef.current?.click()}
+                className="absolute inset-0 bg-slate-950/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-bold cursor-pointer backdrop-blur-2xs shadow-md"
+                title="Click to change shop image"
+              >
+                <Camera className="w-4 h-4 mb-0.5" />
+                <span>{shopImage ? 'Change' : '+ Add'}</span>
+              </button>
+            </div>
+            <input
+              type="file"
+              ref={bannerFileInputRef}
+              accept="image/*"
+              onChange={handleBannerImageFileChange}
+              className="hidden"
+            />
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold mb-3 backdrop-blur-xs">
+                <Store className="w-3.5 h-3.5" />
+                <span>Merchant & Storefront Portal</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Welcome back, {user?.name || 'Partner'}!
+              </h1>
+              <p className="mt-1 text-sm text-emerald-100 max-w-xl">
+                Managing <strong className="text-white">{shopName}</strong> — Keep your store catalog updated and manage incoming neighbor orders in real time.
+              </p>
+              <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-emerald-100">
+                <div className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" />
+                  <span>{category}</span>
+                </div>
+                <Link
+                  href="/addresses"
+                  className="flex items-center gap-1.5 hover:text-white hover:underline transition-colors cursor-pointer"
+                  title="Manage Shop Locations"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>{address}</span>
+                </Link>
+                {isApproved ? (
+                  <div className="flex items-center gap-1.5 text-emerald-200">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Verified Hyperlocal Seller</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-amber-200 bg-amber-500/20 px-2.5 py-0.5 rounded-full border border-amber-300/30">
+                    <Clock className="w-3.5 h-3.5 text-amber-300" />
+                    <span>Pending Admin Verification</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -535,21 +740,287 @@ export default function ShopOwnerDashboard() {
             <span className="text-xs font-medium text-emerald-100 mb-2">Store Order Receiving</span>
             <button
               type="button"
-              onClick={() => setIsOpen(!isOpen)}
-              className={`w-full py-2 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
-                isOpen
-                  ? 'bg-emerald-400 text-emerald-950 shadow-md hover:bg-emerald-300'
-                  : 'bg-red-500/90 text-white hover:bg-red-500'
+              disabled={!isApproved}
+              onClick={() => isApproved && setIsOpen(!isOpen)}
+              className={`w-full py-2 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
+                !isApproved
+                  ? 'bg-amber-500/80 text-white cursor-not-allowed opacity-90'
+                  : isOpen
+                  ? 'bg-emerald-400 text-emerald-950 shadow-md hover:bg-emerald-300 cursor-pointer'
+                  : 'bg-red-500/90 text-white hover:bg-red-500 cursor-pointer'
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${isOpen ? 'bg-emerald-900 animate-ping' : 'bg-white'}`} />
-              <span>{isOpen ? 'Store is OPEN' : 'Store is CLOSED'}</span>
+              <span className={`w-2 h-2 rounded-full ${!isApproved ? 'bg-amber-200' : isOpen ? 'bg-emerald-900 animate-ping' : 'bg-white'}`} />
+              <span>{!isApproved ? 'Pending Approval' : isOpen ? 'Store is OPEN' : 'Store is CLOSED'}</span>
             </button>
             <span className="text-[10px] text-emerald-200 mt-1">
-              {isOpen ? 'Nearby shoppers can place orders' : 'Paused new customer dispatches'}
+              {!isApproved ? 'Verification required to receive orders' : isOpen ? 'Nearby shoppers can place orders' : 'Paused new customer dispatches'}
             </span>
           </div>
         </div>
+      </div>
+
+      {/* Pending Approval Notice */}
+      {!isApproved && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
+          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="space-y-0.5 text-xs">
+            <h4 className="font-extrabold text-sm text-amber-950">Storefront Pending Admin Approval</h4>
+            <p className="text-amber-800 leading-relaxed">
+              Your store profile and catalog are currently under administrative review. Once verified, order receiving and customer dispatches will be unlocked automatically.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Registered Storefront Details Card with Edit & Shop Image */}
+      <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between gap-3 pb-3 border-b border-emerald-100">
+          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+            <Store className="w-4 h-4 text-emerald-600" />
+            <span>Registered Storefront Details</span>
+          </h2>
+          {!isEditingStore ? (
+            <button
+              type="button"
+              onClick={handleStartEditStore}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
+              title="Edit Storefront Details & Shop Image"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+              <span>Edit</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCancelEditStore}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+              title="Cancel Editing"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Cancel</span>
+            </button>
+          )}
+        </div>
+
+        {storeSuccess && (
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium flex items-center gap-2 animate-in fade-in duration-200">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{storeSuccess}</span>
+          </div>
+        )}
+
+        {!isEditingStore ? (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
+            {/* Shop Image Box */}
+            <div className="sm:col-span-1 p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col items-center justify-center text-center space-y-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
+                Shop Image
+              </span>
+              {shopImage ? (
+                <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white">
+                  <img
+                    src={shopImage}
+                    alt={shopName}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700">
+                  <Camera className="w-6 h-6 text-emerald-600 mb-1" />
+                  <span className="text-[10px] font-semibold text-slate-500">No Image</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleStartEditStore}
+                className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                {shopImage ? 'Change Photo' : '+ Add Photo'}
+              </button>
+            </div>
+
+            <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Shop Name</span>
+                <p className="font-extrabold text-slate-900 text-sm">{shopName}</p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Category</span>
+                <p className="font-semibold text-slate-800">{category}</p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Address</span>
+                <p className="font-semibold text-slate-800">{address}</p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSaveStoreDetails} className="space-y-4 pt-1">
+            {storeError && (
+              <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{storeError}</span>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Shop Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={storeName}
+                  onChange={(e) => setStoreName(e.target.value)}
+                  placeholder="e.g. Fresh Daily Supermarket"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none text-xs text-slate-800 bg-white"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Store Category
+                </label>
+                <input
+                  type="text"
+                  value={storeCategory}
+                  onChange={(e) => setStoreCategory(e.target.value)}
+                  placeholder="e.g. Fresh Vegetables & Groceries"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none text-xs text-slate-800 bg-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Store Address / Location
+                </label>
+                <input
+                  type="text"
+                  value={storeAddress}
+                  onChange={(e) => setStoreAddress(e.target.value)}
+                  placeholder="e.g. Shop 12, Ground Floor, Central Mall"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none text-xs text-slate-800 bg-white"
+                />
+              </div>
+            </div>
+
+            {/* Shop Image Option */}
+            <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200/80 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Camera className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Shop Image</span>
+                </label>
+                {storeImage && (
+                  <button
+                    type="button"
+                    onClick={() => setStoreImage('')}
+                    className="text-[11px] font-bold text-red-600 hover:text-red-700 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    <span>Remove Photo</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-emerald-300 shadow-xs bg-white shrink-0 flex items-center justify-center">
+                  {storeImage ? (
+                    <img
+                      src={storeImage}
+                      alt="Shop preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-center p-2 text-slate-400">
+                      <ImageIcon className="w-6 h-6 mx-auto mb-1 text-emerald-400" />
+                      <span className="text-[9px] block">No Photo</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex-1 space-y-2 w-full text-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold cursor-pointer transition-colors shadow-2xs">
+                      <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Upload Shop Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleStoreImageFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                    <span className="text-[11px] text-slate-500">or enter image link below:</span>
+                  </div>
+
+                  <input
+                    type="url"
+                    value={storeImage}
+                    onChange={(e) => setStoreImage(e.target.value)}
+                    placeholder="https://images.unsplash.com/... or paste image URL"
+                    className="w-full px-3 py-1.5 rounded-xl border border-slate-300 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 outline-none text-xs text-slate-800 bg-white"
+                  />
+
+                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                    <span className="text-[10px] text-slate-500 font-medium">Sample images:</span>
+                    <button
+                      type="button"
+                      onClick={() => setStoreImage('https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=500&auto=format&fit=crop&q=80')}
+                      className="text-[10px] text-emerald-700 hover:underline font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200 cursor-pointer"
+                    >
+                      Supermarket
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStoreImage('https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop&q=80')}
+                      className="text-[10px] text-emerald-700 hover:underline font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200 cursor-pointer"
+                    >
+                      Fresh Fruits & Veg
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStoreImage('https://images.unsplash.com/photo-1526367790999-0150786686a2?w=500&auto=format&fit=crop&q=80')}
+                      className="text-[10px] text-emerald-700 hover:underline font-bold bg-white px-2 py-0.5 rounded-md border border-slate-200 cursor-pointer"
+                    >
+                      Organic Mart
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-emerald-100">
+              <button
+                type="button"
+                onClick={handleCancelEditStore}
+                disabled={isSavingStore}
+                className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingStore}
+                className="px-4 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs flex items-center gap-1.5 transition-colors disabled:opacity-60 shadow-xs cursor-pointer"
+              >
+                {isSavingStore ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Store Details</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
 
       {/* Real Metric Cards (Calculated directly from merchant products and actual orders) */}

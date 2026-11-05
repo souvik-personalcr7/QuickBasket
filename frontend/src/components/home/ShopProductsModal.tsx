@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Shop, Product } from '@/data/mockData';
 import { ProductCard } from './ProductCard';
+import { getStoredShopImage } from '@/lib/imageUtils';
 
 interface ShopProductsModalProps {
   shop: Shop | null;
@@ -81,6 +82,11 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
     });
   }, [products, searchQuery, selectedCategory]);
 
+  const activeShopImage = useMemo(() => {
+    if (!shop) return '';
+    return getStoredShopImage(shop);
+  }, [shop]);
+
   if (!isOpen || !shop) return null;
 
   return (
@@ -100,7 +106,7 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 shrink-0 shadow-md">
                 <img
-                  src={shop.image}
+                  src={activeShopImage}
                   alt={shop.name}
                   className="w-full h-full object-cover"
                 />

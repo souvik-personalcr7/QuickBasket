@@ -8,10 +8,12 @@ export interface AuthenticatedRequest extends Request {
   user?: IUser;
 }
 
-interface JwtPayload {
+export interface JwtPayload {
   id: string;
   role: UserRole;
   email: string;
+  isActive?: boolean;
+  isApproved?: boolean;
 }
 
 export const authenticate = async (
@@ -40,8 +42,11 @@ export const authenticate = async (
 
     // 4. Find user in database
     const user = await User.findById(decoded.id);
-    if (!user || !user.isActive) {
-      throw new AppError('The user belonging to this token no longer exists or is deactivated.', 401);
+    if (!user) {
+      throw new AppError('The user belonging to this token no longer exists.', 401);
+    }
+    if (!user.isActive) {
+      throw new AppError('This account has been suspended or deactivated.', 403);
     }
 
     req.user = user;
@@ -74,4 +79,45 @@ export const authorize = (...allowedRoles: UserRole[]) => {
 
     next();
   };
+};
+
+export const requireActive = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    return next(new AppError('Authentication required.', 401));
+  }
+  if (!req.user.isActive) {
+    return next(new AppError('This account has been suspended or deactivated.', 403));
+  }
+  next();
+};
+
+export const requireApproved = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  if (!req.user) {
+    return next(new AppError('Authentication required.', 401));
+  }
+  if (req.user.role === 'shop_owner' && req.user.shopDetails?.isApproved === false) {
+    return next(
+      new AppError(
+        'Your shop owner account is pending administrator approval. Protected storefront operations are locked.',
+        403
+      )
+    );
+  }
+  if (req.user.role === 'delivery_partner' && req.user.deliveryDetails?.isApproved === false) {
+    return next(
+      new AppError(
+        'Your delivery partner account is pending administrator approval. Active delivery operations are locked.',
+        403
+      )
+    );
+  }
+  next();
 };

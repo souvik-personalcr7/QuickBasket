@@ -3,6 +3,7 @@
 import React from 'react';
 import { Star, Bike, ChevronRight } from 'lucide-react';
 import { Shop } from '@/data/mockData';
+import { getStoredShopImage } from '@/lib/imageUtils';
 
 interface ShopCardProps {
   shop: Shop;
@@ -11,6 +12,8 @@ interface ShopCardProps {
 }
 
 export const ShopCard: React.FC<ShopCardProps> = ({ shop, onSelect, isSelected }) => {
+  const cardImage = getStoredShopImage(shop);
+
   return (
     <button
       type="button"
@@ -24,7 +27,7 @@ export const ShopCard: React.FC<ShopCardProps> = ({ shop, onSelect, isSelected }
       {/* Shop Thumbnail */}
       <div className="w-16 h-16 sm:w-18 sm:h-18 rounded-2xl overflow-hidden bg-slate-100 shrink-0 relative border border-slate-100 shadow-2xs">
         <img
-          src={shop.image}
+          src={cardImage}
           alt={shop.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           loading="lazy"
