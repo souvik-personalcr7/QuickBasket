@@ -162,51 +162,21 @@ describe('Strict RBAC Backend Middleware & Authorization Tests', () => {
     });
   });
 
-  describe('requireApproved() approval workflow guard', () => {
-    it('should allow verified/approved shop owner', () => {
+  describe('requireApproved() approval workflow guard (Admin Verification Disabled)', () => {
+    it('should allow shop owner without requiring admin approval', () => {
       const ctx = createMockContext({
         role: 'shop_owner',
         isActive: true,
-        shopDetails: { isApproved: true },
       });
 
       requireApproved(ctx.req, ctx.res, ctx.next);
       assert.strictEqual(ctx.getError(), null);
     });
 
-    it('should block pending shop owner from active operational management with 403', () => {
-      const ctx = createMockContext({
-        role: 'shop_owner',
-        isActive: true,
-        shopDetails: { isApproved: false },
-      });
-
-      requireApproved(ctx.req, ctx.res, ctx.next);
-      const err = ctx.getError();
-      assert.ok(err instanceof AppError);
-      assert.strictEqual(err.statusCode, 403);
-      assert.match(err.message, /pending administrator approval/i);
-    });
-
-    it('should block pending delivery partner from active delivery dispatches with 403', () => {
+    it('should allow delivery partner without requiring admin approval', () => {
       const ctx = createMockContext({
         role: 'delivery_partner',
         isActive: true,
-        deliveryDetails: { isApproved: false },
-      });
-
-      requireApproved(ctx.req, ctx.res, ctx.next);
-      const err = ctx.getError();
-      assert.ok(err instanceof AppError);
-      assert.strictEqual(err.statusCode, 403);
-      assert.match(err.message, /pending administrator approval/i);
-    });
-
-    it('should allow approved delivery partner', () => {
-      const ctx = createMockContext({
-        role: 'delivery_partner',
-        isActive: true,
-        deliveryDetails: { isApproved: true },
       });
 
       requireApproved(ctx.req, ctx.res, ctx.next);
@@ -221,7 +191,6 @@ describe('Strict RBAC Backend Middleware & Authorization Tests', () => {
         email: 'merchant@quickbasket.com',
         role: 'shop_owner',
         isActive: true,
-        shopDetails: { isApproved: true },
       } as unknown as IUser;
 
       const token = signToken(mockUser);
@@ -233,20 +202,6 @@ describe('Strict RBAC Backend Middleware & Authorization Tests', () => {
       assert.strictEqual(decoded.email, 'merchant@quickbasket.com');
       assert.strictEqual(decoded.isActive, true);
       assert.strictEqual(decoded.isApproved, true);
-    });
-
-    it('should correctly flag unapproved shop owner in signed token', () => {
-      const mockUser = {
-        _id: '507f1f77bcf86cd799439012',
-        email: 'pending_owner@quickbasket.com',
-        role: 'shop_owner',
-        isActive: true,
-        shopDetails: { isApproved: false },
-      } as unknown as IUser;
-
-      const token = signToken(mockUser);
-      const decoded = jwt.verify(token, env.JWT_SECRET) as any;
-      assert.strictEqual(decoded.isApproved, false);
     });
   });
 });

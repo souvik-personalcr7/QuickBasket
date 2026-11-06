@@ -22,7 +22,19 @@ export interface IDeliveryAddressSnapshot {
   location: IGeoPoint;
 }
 
+export type CanonicalOrderStatus =
+  | 'ORDER_PLACED'
+  | 'SHOP_ACCEPTED'
+  | 'FINDING_RIDER'
+  | 'RIDER_ASSIGNED'
+  | 'RIDER_ACCEPTED'
+  | 'PICKED_UP'
+  | 'OUT_FOR_DELIVERY'
+  | 'DELIVERED'
+  | 'CANCELLED';
+
 export type OrderStatus =
+  | CanonicalOrderStatus
   | 'placed'
   | 'confirmed'
   | 'packing'
@@ -30,8 +42,18 @@ export type OrderStatus =
   | 'delivered'
   | 'cancelled';
 
+export interface IRiderLiveLocation {
+  latitude: number;
+  longitude: number;
+  heading?: number;
+  accuracy?: number;
+  updatedAt: Date;
+}
+
 export interface IOrder extends Document {
   user: Types.ObjectId;
+  shop?: Types.ObjectId;
+  deliveryPartner?: Types.ObjectId;
   items: IOrderItem[];
   deliveryAddress: IDeliveryAddressSnapshot;
   subtotal: number;
@@ -42,6 +64,16 @@ export interface IOrder extends Document {
   paymentMethod: string;
   paymentStatus: 'pending' | 'paid' | 'failed';
   estimatedDeliveryTime?: string;
+  riderLocation?: IRiderLiveLocation;
+  placedAt: Date;
+  shopAcceptedAt?: Date;
+  riderAssignedAt?: Date;
+  riderAcceptedAt?: Date;
+  pickedUpAt?: Date;
+  deliveredAt?: Date;
+  cancelledAt?: Date;
+  routeDistanceKm?: number;
+  routeEtaMinutes?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,6 +84,16 @@ const OrderSchema = new Schema<IOrder>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
+    },
+    shop: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+    deliveryPartner: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
       index: true,
     },
     items: [
@@ -91,8 +133,24 @@ const OrderSchema = new Schema<IOrder>(
     totalAmount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['placed', 'confirmed', 'packing', 'out_for_delivery', 'delivered', 'cancelled'],
-      default: 'placed',
+      enum: [
+        'ORDER_PLACED',
+        'SHOP_ACCEPTED',
+        'FINDING_RIDER',
+        'RIDER_ASSIGNED',
+        'RIDER_ACCEPTED',
+        'PICKED_UP',
+        'OUT_FOR_DELIVERY',
+        'DELIVERED',
+        'CANCELLED',
+        'placed',
+        'confirmed',
+        'packing',
+        'out_for_delivery',
+        'delivered',
+        'cancelled',
+      ],
+      default: 'ORDER_PLACED',
       index: true,
     },
     paymentMethod: { type: String, default: 'Cash on Delivery' },
@@ -102,6 +160,22 @@ const OrderSchema = new Schema<IOrder>(
       default: 'pending',
     },
     estimatedDeliveryTime: { type: String, default: '15-25 mins' },
+    riderLocation: {
+      latitude: { type: Number },
+      longitude: { type: Number },
+      heading: { type: Number },
+      accuracy: { type: Number },
+      updatedAt: { type: Date },
+    },
+    placedAt: { type: Date, default: Date.now },
+    shopAcceptedAt: { type: Date },
+    riderAssignedAt: { type: Date },
+    riderAcceptedAt: { type: Date },
+    pickedUpAt: { type: Date },
+    deliveredAt: { type: Date },
+    cancelledAt: { type: Date },
+    routeDistanceKm: { type: Number },
+    routeEtaMinutes: { type: Number },
   },
   {
     timestamps: true,
@@ -109,7 +183,8 @@ const OrderSchema = new Schema<IOrder>(
 );
 
 OrderSchema.index({ user: 1, createdAt: -1 });
+OrderSchema.index({ deliveryPartner: 1, status: 1 });
+OrderSchema.index({ shop: 1, status: 1 });
 
 export const Order: Model<IOrder> =
   mongoose.models.Order || mongoose.model<IOrder>('Order', OrderSchema);
-

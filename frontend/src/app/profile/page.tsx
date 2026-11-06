@@ -31,6 +31,8 @@ import { useAuth } from '@/context/AuthContext';
 import { Address } from '@/types/address';
 import { fetchAddresses } from '@/lib/addressApi';
 import { compressImageFile, syncShopImageToStorage, getStoredShopImage } from '@/lib/imageUtils';
+import { apiClient } from '@/lib/api';
+import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
 
 export default function ProfilePage() {
   const { user, isAuthenticated, isLoading, logout, role, getRoleRedirectPath, updateUserAddress, updateShopDetails, updateUserProfile } = useAuth();
@@ -44,6 +46,16 @@ export default function ProfilePage() {
   }, [isLoading, user, router]);
 
   const [deliveryAddresses, setDeliveryAddresses] = useState<Address[]>([]);
+  const [customerOrders, setCustomerOrders] = useState<Array<{
+    _id: string;
+    status: string;
+    items: Array<{ name: string; quantity: number; price: number }>;
+    totalAmount: number;
+    createdAt: string;
+  }>>([]);
+  const [isOrdersLoading, setIsOrdersLoading] = useState(false);
+  const [selectedOrderToTrack, setSelectedOrderToTrack] = useState<string | null>(null);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
 
   // Shop Owner / User Profile edit state
   const [isEditingOwner, setIsEditingOwner] = useState(false);
@@ -135,8 +147,20 @@ export default function ProfilePage() {
           setDeliveryAddresses(res.addresses);
         }
       });
+
+      if (role === 'customer') {
+        setIsOrdersLoading(true);
+        apiClient<{ orders: any[] }>('/orders')
+          .then((res) => {
+            if (res.success && res.data?.orders) {
+              setCustomerOrders(res.data.orders);
+            }
+          })
+          .catch((err) => console.warn('Could not load customer orders:', err))
+          .finally(() => setIsOrdersLoading(false));
+      }
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, role]);
 
   const activeDeliveryAddress =
     deliveryAddresses.find((a) => a.isDefault) || deliveryAddresses[0] || null;
@@ -1033,16 +1057,97 @@ export default function ProfilePage() {
               </Link>
             </div>
 
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
-              <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
-              <p className="text-xs font-bold text-slate-800">No past orders yet</p>
-              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-                Once you place grocery orders on QuickBasket, your order receipts and delivery tracking will be shown here.
-              </p>
-            </div>
+            {isOrdersLoading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="w-6 h-6 text-emerald-600 animate-spin mx-auto" />
+                <p className="text-xs text-slate-500 mt-2">Loading your orders...</p>
+              </div>
+            ) : customerOrders.length === 0 ? (
+              <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 text-center space-y-2">
+                <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-800">No past orders yet</p>
+                <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                  Once you place grocery orders on QuickBasket, your order receipts and delivery tracking will be shown here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customerOrders.map((ord) => {
+                  const isLive =
+                    ord.status !== 'DELIVERED' &&
+                    ord.status !== 'delivered' &&
+                    ord.status !== 'CANCELLED' &&
+                    ord.status !== 'cancelled';
+                  return (
+                    <div
+                      key={ord._id}
+                      className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-200 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-900">
+                            Order #{ord._id.slice(-6).toUpperCase()}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              ord.status === 'DELIVERED' || ord.status === 'delivered'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : ord.status === 'CANCELLED' || ord.status === 'cancelled'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800 animate-pulse'
+                            }`}
+                          >
+                            {ord.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium line-clamp-1">
+                          {Array.isArray(ord.items)
+                            ? ord.items.map((it) => `${it.quantity}x ${it.name}`).join(', ')
+                            : 'Grocery Items'}
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          {new Date(ord.createdAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}{' '}
+                          &bull; ₹{ord.totalAmount}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedOrderToTrack(ord._id);
+                            setIsTrackModalOpen(true);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                            isLive
+                              ? 'bg-[#0f5132] hover:bg-[#166534] text-white shadow-emerald-900/10'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          <Bike className="w-3.5 h-3.5" />
+                          <span>{isLive ? 'Track Live' : 'View Tracking'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Live Order Tracking Modal */}
+      <TrackOrderModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+        orderId={selectedOrderToTrack}
+      />
     </div>
   );
 }

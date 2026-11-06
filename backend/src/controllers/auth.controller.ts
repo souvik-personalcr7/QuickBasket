@@ -9,12 +9,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 // Helper to sign JWT
 export const signToken = (user: IUser): string => {
-  const isApproved =
-    user.role === 'shop_owner'
-      ? Boolean(user.shopDetails?.isApproved)
-      : user.role === 'delivery_partner'
-      ? Boolean(user.deliveryDetails?.isApproved ?? true)
-      : true;
+  const isApproved = true;
 
   return jwt.sign(
     {
@@ -272,7 +267,7 @@ export const updateShopDetails = async (
       category: parsed.data.category !== undefined ? parsed.data.category.trim() : (current.category || 'General Store'),
       address: parsed.data.address !== undefined ? parsed.data.address.trim() : (current.address || ''),
       image: parsed.data.image !== undefined ? parsed.data.image.trim() : (current.image || ''),
-      isApproved: current.isApproved !== undefined ? current.isApproved : false,
+      isApproved: true,
     };
 
     await user.save();

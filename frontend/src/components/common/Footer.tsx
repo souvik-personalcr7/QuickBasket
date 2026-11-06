@@ -14,11 +14,13 @@ import {
   Clock,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
 
 export const Footer: React.FC = () => {
   const { user, isAuthenticated, role } = useAuth();
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -349,7 +351,13 @@ export const Footer: React.FC = () => {
                     <Link href="#shops" className="hover:text-white transition-colors">Shops</Link>
                   </li>
                   <li>
-                    <Link href="#track-order" className="hover:text-white transition-colors">Track Order</Link>
+                    <button
+                      type="button"
+                      onClick={() => setIsTrackModalOpen(true)}
+                      className="hover:text-white transition-colors cursor-pointer text-left"
+                    >
+                      Track Order Live
+                    </button>
                   </li>
                 </ul>
               </div>
@@ -426,6 +434,10 @@ export const Footer: React.FC = () => {
           </div>
         )}
       </div>
+      <TrackOrderModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+      />
     </footer>
   );
 };

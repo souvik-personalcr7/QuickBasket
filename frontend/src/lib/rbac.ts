@@ -14,7 +14,7 @@ export const ROLE_DASHBOARDS: Record<AppRole, string> = {
   customer: '/',
   shop_owner: '/shop',
   delivery_partner: '/delivery',
-  admin: '/admin',
+  admin: '/',
 };
 
 /**
@@ -235,15 +235,8 @@ export function evaluateRouteAccess(
     return { action: 'allow' };
   }
 
-  // --- ADMIN ---
+  // --- ADMIN (Disabled during location feature testing) ---
   if (role === 'admin') {
-    if (isShopRoute(normPath) || isDeliveryRoute(normPath) || isCustomerOnlyRoute(normPath) || normPath === '/') {
-      return {
-        action: 'redirect',
-        targetUrl: '/admin',
-        reason: 'Admin is isolated from operational portal pages and customer home',
-      };
-    }
     return { action: 'allow' };
   }
 

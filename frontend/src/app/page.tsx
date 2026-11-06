@@ -29,8 +29,6 @@ export default function CustomerHomePage() {
         router.replace('/shop');
       } else if (role === 'delivery_partner') {
         router.replace('/delivery');
-      } else if (role === 'admin') {
-        router.replace('/admin');
       }
     }
   }, [isLoading, role, router]);

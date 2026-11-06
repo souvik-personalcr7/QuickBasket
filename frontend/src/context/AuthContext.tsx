@@ -28,9 +28,8 @@ export const getRoleRedirectPath = (role: UserRole): string => {
       return '/shop';
     case 'delivery_partner':
       return '/delivery';
-    case 'admin':
-      return '/admin';
     case 'customer':
+    case 'admin':
     default:
       return '/';
   }

@@ -22,12 +22,14 @@ import {
   Home,
   Briefcase,
   AlertCircle,
+  Bike,
 } from 'lucide-react';
 import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { Address } from '@/types/address';
 import { fetchAddresses } from '@/lib/addressApi';
 import { apiClient } from '@/lib/api';
+import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
 import { AddressFormModal } from '@/components/location/AddressFormModal';
 
 export default function CartPage() {
@@ -55,6 +57,7 @@ export default function CartPage() {
   const [addressError, setAddressError] = useState<string | null>(null);
 
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [placedOrderDetails, setPlacedOrderDetails] = useState<{
     orderId?: string;
     deliveryAddress?: any;
@@ -222,14 +225,29 @@ export default function CartPage() {
           </div>
         )}
 
-        <div className="pt-2 flex justify-center gap-4">
+        <div className="pt-2 flex flex-col sm:flex-row justify-center items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setIsTrackModalOpen(true)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md transition-colors cursor-pointer"
+          >
+            <Bike className="w-4 h-4" />
+            <span>Track Order Live (Map &amp; ETA)</span>
+          </button>
           <Link
             href="/"
-            className="px-6 py-2.5 rounded-full bg-[#0f5132] hover:bg-[#166534] text-white font-bold text-sm shadow-sm transition-colors"
+            className="w-full sm:w-auto px-6 py-2.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm transition-colors text-center"
           >
             Continue Shopping
           </Link>
         </div>
+
+        {/* Live Order Tracking Modal */}
+        <TrackOrderModal
+          isOpen={isTrackModalOpen}
+          onClose={() => setIsTrackModalOpen(false)}
+          orderId={placedOrderDetails?.orderId}
+        />
       </div>
     );
   }

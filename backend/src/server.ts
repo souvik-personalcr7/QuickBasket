@@ -3,6 +3,7 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
+import { initSocketService } from './services/socket.service';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -17,18 +18,8 @@ export const io = new SocketIOServer(server, {
   },
 });
 
-io.on('connection', (socket) => {
-  console.log(`🔌 Socket client connected: ${socket.id}`);
-
-  socket.on('join_order_room', (orderId: string) => {
-    socket.join(`order:${orderId}`);
-    console.log(`Socket ${socket.id} joined order room order:${orderId}`);
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`🔌 Socket client disconnected: ${socket.id}`);
-  });
-});
+// Mount authenticated real-time order tracking and rider dispatch service
+initSocketService(io);
 
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {

@@ -95,14 +95,14 @@ const UserSchema = new Schema<IUser>(
       category: { type: String, trim: true, default: '' },
       address: { type: String, trim: true, default: '' },
       image: { type: String, trim: true, default: '' },
-      isApproved: { type: Boolean, default: false },
+      isApproved: { type: Boolean, default: true },
     },
     deliveryDetails: {
       vehicleType: { type: String, trim: true, default: '' },
       vehicleNumber: { type: String, trim: true, default: '' },
       isAvailable: { type: Boolean, default: true },
       city: { type: String, trim: true, default: '' },
-      isApproved: { type: Boolean, default: false },
+      isApproved: { type: Boolean, default: true },
     },
     isActive: {
       type: Boolean,

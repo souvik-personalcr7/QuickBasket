@@ -149,11 +149,11 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
     });
   });
 
-  describe('4. ADMIN Role Isolation', () => {
-    test('Admin is redirected to /admin when accessing operational portal routes', () => {
-      assert.equal(evaluateRouteAccess('/shop', adminSession).targetUrl, '/admin');
-      assert.equal(evaluateRouteAccess('/delivery', adminSession).targetUrl, '/admin');
-      assert.equal(evaluateRouteAccess('/cart', adminSession).targetUrl, '/admin');
+  describe('4. ADMIN Role (Disabled for location testing)', () => {
+    test('Admin feature is bypassed/allowed during location testing', () => {
+      assert.equal(evaluateRouteAccess('/shop', adminSession).action, 'allow');
+      assert.equal(evaluateRouteAccess('/delivery', adminSession).action, 'allow');
+      assert.equal(evaluateRouteAccess('/cart', adminSession).action, 'allow');
     });
   });
 

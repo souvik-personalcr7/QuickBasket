@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware';
-import { createOrder, getOrders, getOrderById } from '../controllers/order.controller';
+import {
+  createOrder,
+  getOrders,
+  getOrderById,
+  getOrderRoute,
+  updateShopOrderStatus,
+} from '../controllers/order.controller';
 
 const router = Router();
 
@@ -10,6 +16,7 @@ router.use(authenticate);
 router.post('/', authorize('customer', 'admin'), createOrder);
 router.get('/', getOrders);
 router.get('/:id', getOrderById);
+router.get('/:id/route', getOrderRoute);
+router.patch('/:id/shop-status', authorize('shop_owner', 'admin'), updateShopOrderStatus);
 
 export const orderRoutes = router;
-

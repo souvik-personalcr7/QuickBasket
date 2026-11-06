@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MapPin } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
 
 interface HeaderProps {
   cartCount?: number;
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const [mounted, setMounted] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [isTrackModalOpen, setIsTrackModalOpen] = useState(false);
   const [activeNav, setActiveNav] = useState('Home');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +92,6 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
       case 'delivery_partner':
         return 'Delivery Partner Dashboard';
       case 'admin':
-        return 'Admin Console';
       default:
         return 'My Account & Orders';
     }
@@ -227,6 +228,28 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
               <nav className="hidden md:flex items-center gap-8">
                 {navLinks.map((link) => {
                   const isActive = activeNav === link.name;
+                  if (link.name === 'Track Order') {
+                    return (
+                      <button
+                        key={link.name}
+                        type="button"
+                        onClick={() => {
+                          setActiveNav(link.name);
+                          setIsTrackModalOpen(true);
+                        }}
+                        className={`relative text-sm font-semibold transition-colors py-1 cursor-pointer ${
+                          isActive
+                            ? 'text-[#15803d]'
+                            : 'text-slate-600 hover:text-[#15803d]'
+                        }`}
+                      >
+                        {link.name}
+                        {isActive && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#15803d] rounded-full" />
+                        )}
+                      </button>
+                    );
+                  }
                   return (
                     <Link
                       key={link.name}
@@ -477,23 +500,45 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 </nav>
               ) : (
                 <nav className="mt-4 space-y-2">
-                  {navLinks.map((link) => (
-                    <Link
-                      key={link.name}
-                      href={link.href}
-                      onClick={() => {
-                        setActiveNav(link.name);
-                        setMobileMenuOpen(false);
-                      }}
-                      className={`block px-3 py-2 text-base font-semibold rounded-lg ${
-                        activeNav === link.name
-                          ? 'bg-emerald-50 text-[#15803d]'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      {link.name}
-                    </Link>
-                  ))}
+                  {navLinks.map((link) => {
+                    if (link.name === 'Track Order') {
+                      return (
+                        <button
+                          key={link.name}
+                          type="button"
+                          onClick={() => {
+                            setActiveNav(link.name);
+                            setMobileMenuOpen(false);
+                            setIsTrackModalOpen(true);
+                          }}
+                          className={`w-full text-left block px-3 py-2 text-base font-semibold rounded-lg cursor-pointer ${
+                            activeNav === link.name
+                              ? 'bg-emerald-50 text-[#15803d]'
+                              : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {link.name}
+                        </button>
+                      );
+                    }
+                    return (
+                      <Link
+                        key={link.name}
+                        href={link.href}
+                        onClick={() => {
+                          setActiveNav(link.name);
+                          setMobileMenuOpen(false);
+                        }}
+                        className={`block px-3 py-2 text-base font-semibold rounded-lg ${
+                          activeNav === link.name
+                            ? 'bg-emerald-50 text-[#15803d]'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {link.name}
+                      </Link>
+                    );
+                  })}
                 </nav>
               )}
             </div>
@@ -524,6 +569,12 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
           </div>
         </div>
       )}
+
+      {/* Live Order Tracking Modal */}
+      <TrackOrderModal
+        isOpen={isTrackModalOpen}
+        onClose={() => setIsTrackModalOpen(false)}
+      />
     </>
   );
 };

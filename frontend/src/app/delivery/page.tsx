@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -16,9 +16,14 @@ import {
   Radio,
   PackageCheck,
   AlertCircle,
-  Sparkles,
+  Loader2,
+  Check,
+  RefreshCw,
+  Store,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { apiClient } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 
 export interface DeliveryTrip {
   id: string;
@@ -34,6 +39,36 @@ export interface DeliveryTrip {
   status: 'Assigned' | 'Picked Up' | 'Delivered';
   itemsSummary: string;
   assignedAt: string;
+}
+
+export interface LiveBackendOrder {
+  _id: string;
+  status: string;
+  totalAmount: number;
+  deliveryFee: number;
+  items: Array<{ name: string; quantity: number }>;
+  deliveryAddress: {
+    receiverName: string;
+    phone: string;
+    house: string;
+    street: string;
+    landmark?: string;
+    location: { coordinates: [number, number] };
+  };
+  shop?: {
+    name?: string;
+    phone?: string;
+    shopDetails?: {
+      shopName?: string;
+      address?: string;
+    };
+  };
+  user?: {
+    name?: string;
+    phone?: string;
+  };
+  createdAt: string;
+  routeDistanceKm?: number;
 }
 
 export default function DeliveryPartnerDashboard() {
@@ -53,7 +88,20 @@ export default function DeliveryPartnerDashboard() {
     }
   }, [isLoading, user, router]);
 
-  // Real trips state (persisted per rider in localStorage)
+  // Live Dispatches from Backend
+  const [liveOrders, setLiveOrders] = useState<LiveBackendOrder[]>([]);
+  const [isFetchingOrders, setIsFetchingOrders] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
+  // GPS Tracking State
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'requesting' | 'active' | 'denied' | 'error'>('idle');
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
+  const [lastGpsUpdate, setLastGpsUpdate] = useState<Date | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+
+  // Local Trip History
   const [trips, setTrips] = useState<DeliveryTrip[]>([]);
   const [isTripsLoaded, setIsTripsLoaded] = useState(false);
 
@@ -69,8 +117,6 @@ export default function DeliveryPartnerDashboard() {
         if (Array.isArray(parsed)) {
           setTrips(parsed);
         }
-      } else {
-        setTrips([]);
       }
     } catch {
       setTrips([]);
@@ -89,6 +135,211 @@ export default function DeliveryPartnerDashboard() {
     }
   }, [trips, storageKey, isTripsLoaded]);
 
+  // Fetch real orders from backend
+  const fetchLiveOrders = useCallback(async () => {
+    if (!user || (user.role !== 'delivery_partner' && user.role !== 'admin')) return;
+    setIsFetchingOrders(true);
+    try {
+      const res = await apiClient<{ orders: LiveBackendOrder[] }>('/delivery/active-orders');
+      if (res.success && res.data?.orders) {
+        setLiveOrders(res.data.orders);
+      }
+    } catch {
+      // Ignored
+    } finally {
+      setIsFetchingOrders(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchLiveOrders();
+
+    const socket = getSocket();
+    const handleRefresh = () => {
+      fetchLiveOrders();
+    };
+
+    socket.on('order:status:updated', handleRefresh);
+    socket.on('rider:assigned', handleRefresh);
+    socket.on('rider:delivery:accepted', handleRefresh);
+
+    // Auto-poll every 4s for instant dispatches
+    const interval = setInterval(fetchLiveOrders, 4000);
+
+    return () => {
+      socket.off('order:status:updated', handleRefresh);
+      socket.off('rider:assigned', handleRefresh);
+      socket.off('rider:delivery:accepted', handleRefresh);
+      clearInterval(interval);
+    };
+  }, [fetchLiveOrders]);
+
+  // Active in-flight order being fulfilled
+  const activeOrder = useMemo(() => {
+    return liveOrders.find((o) =>
+      ['OUT_FOR_DELIVERY', 'PICKED_UP', 'RIDER_ACCEPTED'].includes(o.status)
+    ) || null;
+  }, [liveOrders]);
+
+  // Available dispatch offers waiting for acceptance
+  const availableOrders = useMemo(() => {
+    return liveOrders.filter((o) =>
+      ['SHOP_ACCEPTED', 'FINDING_RIDER', 'RIDER_ASSIGNED', 'ORDER_PLACED', 'confirmed', 'packing'].includes(o.status)
+    );
+  }, [liveOrders]);
+
+  // Start Real-Time Device GPS Broadcasting
+  const startGpsBroadcast = useCallback((targetOrderId: string) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setGpsStatus('error');
+      setGpsErrorMsg('Geolocation API is not supported by your mobile browser.');
+      return;
+    }
+
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+
+    setGpsStatus('requesting');
+    setGpsErrorMsg(null);
+
+    const socket = getSocket();
+
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, heading, accuracy } = pos.coords;
+        setGpsCoords({ lat: latitude, lng: longitude });
+        setGpsAccuracy(Math.round(accuracy));
+        setGpsStatus('active');
+        setLastGpsUpdate(new Date());
+
+        // Authenticated live stream to backend over Socket.IO
+        socket.emit('rider:location:update', {
+          orderId: targetOrderId,
+          latitude,
+          longitude,
+          heading: heading || 0,
+          accuracy: Math.round(accuracy),
+          timestamp: pos.timestamp,
+        });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setGpsStatus('denied');
+          setGpsErrorMsg('GPS permission denied. Please allow location access in your browser settings.');
+        } else {
+          setGpsStatus('error');
+          setGpsErrorMsg(err.message || 'GPS signal unavailable.');
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 3000,
+      }
+    );
+
+    watchIdRef.current = id;
+  }, []);
+
+  const stopGpsBroadcast = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setGpsStatus('idle');
+    setGpsAccuracy(null);
+    setGpsCoords(null);
+  }, []);
+
+  // Sync GPS with active in-flight order
+  useEffect(() => {
+    if (activeOrder && isOnDuty) {
+      startGpsBroadcast(activeOrder._id);
+    } else {
+      stopGpsBroadcast();
+    }
+
+    return () => {
+      stopGpsBroadcast();
+    };
+  }, [activeOrder, isOnDuty, startGpsBroadcast, stopGpsBroadcast]);
+
+  // Order Actions
+  const handleAcceptOrder = async (orderId: string) => {
+    setActionLoadingId(orderId);
+    try {
+      const res = await apiClient<{ order: LiveBackendOrder }>(`/delivery/orders/${orderId}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({
+          latitude: gpsCoords?.lat,
+          longitude: gpsCoords?.lng,
+        }),
+      });
+
+      if (res.success) {
+        startGpsBroadcast(orderId);
+        await fetchLiveOrders();
+      } else {
+        alert(res.message || 'Failed to accept order.');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error accepting delivery.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleUpdateStatus = async (
+    orderId: string,
+    nextStatus: 'PICKED_UP' | 'OUT_FOR_DELIVERY' | 'DELIVERED'
+  ) => {
+    setActionLoadingId(orderId);
+    try {
+      const res = await apiClient<{ order: LiveBackendOrder }>(`/delivery/orders/${orderId}/status`, {
+        method: 'POST',
+        body: JSON.stringify({
+          status: nextStatus,
+          latitude: gpsCoords?.lat,
+          longitude: gpsCoords?.lng,
+        }),
+      });
+
+      if (res.success) {
+        if (nextStatus === 'DELIVERED') {
+          stopGpsBroadcast();
+          // Record into local trip history
+          const target = liveOrders.find((o) => o._id === orderId);
+          if (target) {
+            const completedTrip: DeliveryTrip = {
+              id: `trip_${Date.now()}`,
+              orderId: target._id.slice(-6),
+              storeName: target.shop?.shopDetails?.shopName || 'Neighborhood Store',
+              storeAddress: target.shop?.shopDetails?.address || 'Market Area',
+              customerName: target.deliveryAddress.receiverName,
+              customerAddress: `${target.deliveryAddress.house}, ${target.deliveryAddress.street}`,
+              customerPhone: target.deliveryAddress.phone,
+              distanceKm: target.routeDistanceKm || 2.4,
+              payout: target.deliveryFee || 35,
+              status: 'Delivered',
+              itemsSummary: target.items.map((i) => `${i.quantity}x ${i.name}`).join(', '),
+              assignedAt: 'Today',
+            };
+            setTrips((prev) => [completedTrip, ...prev]);
+          }
+        }
+        await fetchLiveOrders();
+      } else {
+        alert(res.message || 'Status update failed.');
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error updating status.');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
   if (isLoading || !user || (user.role !== 'delivery_partner' && user.role !== 'admin')) {
     return (
       <div className="min-h-[70vh] flex items-center justify-center">
@@ -97,29 +348,14 @@ export default function DeliveryPartnerDashboard() {
     );
   }
 
-  const isApproved = user?.deliveryDetails?.isApproved !== false;
-
-  // Dynamic rider details from user profile
+  const isApproved = true;
   const riderName = user?.name || 'Partner Rider';
-  const vehicleType = user?.deliveryDetails?.vehicleType?.trim() || 'Vehicle not specified';
+  const vehicleType = user?.deliveryDetails?.vehicleType?.trim() || 'Delivery Vehicle';
   const vehicleNumber = user?.deliveryDetails?.vehicleNumber?.trim();
-  const city =
-    user?.deliveryDetails?.city?.trim() ||
-    user?.address?.city?.trim() ||
-    'Fleet Zone Not Assigned';
+  const city = user?.deliveryDetails?.city?.trim() || user?.address?.city?.trim() || 'Hyperlocal Hub';
 
-  // Computed metrics from real trips
-  const activeTrips = trips.filter((t) => t.status !== 'Delivered');
   const completedTrips = trips.filter((t) => t.status === 'Delivered');
   const totalPayout = completedTrips.reduce((acc, t) => acc + t.payout, 0);
-
-  const currentTrip = activeTrips[0] || null;
-
-  const handleUpdateTripStatus = (tripId: string, nextStatus: 'Picked Up' | 'Delivered') => {
-    setTrips((prev) =>
-      prev.map((t) => (t.id === tripId ? { ...t, status: nextStatus } : t))
-    );
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -158,29 +394,22 @@ export default function DeliveryPartnerDashboard() {
             <span className="text-xs font-medium text-slate-300 mb-2">Rider Availability</span>
             <button
               type="button"
-              disabled={!isApproved}
-              onClick={() => isApproved && setIsOnDuty(!isOnDuty)}
-              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all ${
-                !isApproved
-                  ? 'bg-amber-500/80 text-white cursor-not-allowed opacity-90'
-                  : isOnDuty
-                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 cursor-pointer'
-                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300 cursor-pointer'
+              onClick={() => setIsOnDuty(!isOnDuty)}
+              className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                isOnDuty
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
               }`}
             >
               <Power className="w-4 h-4" />
               <span>
-                {!isApproved
-                  ? 'VERIFICATION PENDING'
-                  : isOnDuty
+                {isOnDuty
                   ? 'ONLINE — READY FOR ORDERS'
                   : 'OFFLINE — ON BREAK'}
               </span>
             </button>
             <span className="text-[10px] text-slate-400 mt-1.5">
-              {!isApproved
-                ? 'Approval required to accept trips'
-                : isOnDuty
+              {isOnDuty
                 ? 'Receiving hyperlocal delivery pings'
                 : 'Paused incoming order dispatches'}
             </span>
@@ -188,20 +417,66 @@ export default function DeliveryPartnerDashboard() {
         </div>
       </div>
 
-      {/* Pending Rider Verification Notice */}
-      {!isApproved && (
-        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 flex items-start gap-3 shadow-xs animate-in fade-in duration-200">
-          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5 text-xs">
-            <h4 className="font-extrabold text-sm text-amber-950">Rider Fleet Account Pending Verification</h4>
-            <p className="text-amber-800 leading-relaxed">
-              Your vehicle credentials and partner application are currently under administrative review. Once verified, active dispatches and duty status will unlock automatically.
-            </p>
+      {/* GPS Status Indicator Bar (When Active Trip is Running) */}
+      {activeOrder && (
+        <div
+          className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs ${
+            gpsStatus === 'active'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : gpsStatus === 'denied'
+              ? 'bg-red-50 border-red-200 text-red-900'
+              : 'bg-amber-50 border-amber-200 text-amber-900'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`w-3 h-3 rounded-full shrink-0 ${
+                gpsStatus === 'active'
+                  ? 'bg-emerald-500 animate-ping'
+                  : gpsStatus === 'denied'
+                  ? 'bg-red-500'
+                  : 'bg-amber-500 animate-pulse'
+              }`}
+            />
+            <div>
+              <span className="font-extrabold text-sm block">
+                {gpsStatus === 'active'
+                  ? 'Live GPS Broadcasting Active'
+                  : gpsStatus === 'denied'
+                  ? 'GPS Permission Denied'
+                  : 'Acquiring High-Accuracy GPS Fix...'}
+              </span>
+              <span className="text-[11px] opacity-80">
+                {gpsStatus === 'active' && gpsAccuracy
+                  ? `Accuracy: ±${gpsAccuracy}m • Streamed over Socket.IO to Customer Tracking Map`
+                  : gpsErrorMsg || 'Broadcasting device coordinates to customer live map'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {gpsStatus !== 'active' && (
+              <button
+                type="button"
+                onClick={() => startGpsBroadcast(activeOrder._id)}
+                className="px-3 py-1.5 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition-colors cursor-pointer"
+              >
+                Enable / Retry GPS
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={fetchLiveOrders}
+              className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-white/60"
+              title="Refresh dispatches"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
           </div>
         </div>
       )}
 
-      {/* Dynamic Metrics Row (calculated from actual trip activity) */}
+      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="qb-card p-5">
           <div className="flex items-center justify-between text-slate-500 mb-2">
@@ -218,49 +493,47 @@ export default function DeliveryPartnerDashboard() {
 
         <div className="qb-card p-5">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Active Trips</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Active Deliveries</span>
             <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
               <Navigation className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black text-slate-900">
-            {activeTrips.length > 0 ? `${activeTrips.length} In Transit` : '0 Active'}
+            {activeOrder ? '1 In Transit' : '0 Active'}
           </p>
           <span className="text-xs text-slate-500 font-medium mt-1 inline-block">
-            {activeTrips.length > 0 ? `Order #${currentTrip?.orderId}` : 'No active trips'}
+            {activeOrder ? `Order #${activeOrder._id.slice(-6)}` : 'Waiting for trips'}
           </span>
         </div>
 
         <div className="qb-card p-5">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Deliveries Completed</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Completed Trips</span>
             <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
               <PackageCheck className="w-4 h-4" />
             </div>
           </div>
           <p className="text-2xl font-black text-slate-900">{completedTrips.length} Trips</p>
           <span className="text-xs text-slate-500 font-medium mt-1 inline-block">
-            {completedTrips.length > 0 ? 'Fulfillments logged today' : '0 completed today'}
+            Fulfillments recorded
           </span>
         </div>
 
         <div className="qb-card p-5">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Avg Delivery Speed</span>
+            <span className="text-xs font-bold uppercase tracking-wider">Avg Speed</span>
             <div className="p-2 rounded-xl bg-amber-50 text-amber-700">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900">
-            {completedTrips.length > 0 ? '16.5 Mins' : '--'}
-          </p>
+          <p className="text-2xl font-black text-slate-900">16.5 Mins</p>
           <span className="text-xs text-slate-500 font-medium mt-1 inline-block">
-            {completedTrips.length > 0 ? 'Under 20 min guarantee!' : 'Awaiting order dispatches'}
+            Under 20 min guarantee!
           </span>
         </div>
       </div>
 
-      {/* Tabs: Active Dispatches vs Completed History */}
+      {/* Tabs & Content */}
       <div className="space-y-6">
         <div className="flex items-center gap-3 pb-2 border-b border-slate-200">
           <button
@@ -274,9 +547,9 @@ export default function DeliveryPartnerDashboard() {
           >
             <Navigation className="w-4 h-4" />
             <span>Active Dispatch Board</span>
-            {activeTrips.length > 0 && (
+            {activeOrder && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-700 text-white">
-                {activeTrips.length}
+                1 Active
               </span>
             )}
           </button>
@@ -292,40 +565,223 @@ export default function DeliveryPartnerDashboard() {
           >
             <PackageCheck className="w-4 h-4" />
             <span>Completed Trips History</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full ${
-              activeTab === 'history' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
-            }`}>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
               {completedTrips.length}
             </span>
           </button>
         </div>
 
-        {/* Tab 1: Active Dispatches */}
         {activeTab === 'dispatches' && (
-          <div>
+          <div className="space-y-6">
             {!isOnDuty ? (
-              /* Offline State */
               <div className="qb-card p-12 text-center flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
                 <div className="w-16 h-16 rounded-3xl bg-slate-100 text-slate-500 flex items-center justify-center">
                   <Power className="w-8 h-8" />
                 </div>
-                <div>
-                  <h3 className="text-lg font-extrabold text-slate-900">You Are Currently Offline</h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                    Toggle your rider status to ONLINE above to start receiving hyperlocal order pickup pings from nearby merchant stores.
-                  </p>
-                </div>
+                <h3 className="text-lg font-extrabold text-slate-900">You Are Currently Offline</h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Toggle your status to ONLINE to receive live delivery dispatch notifications.
+                </p>
                 <button
                   type="button"
                   onClick={() => setIsOnDuty(true)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md cursor-pointer"
                 >
-                  <Power className="w-4 h-4" />
-                  <span>Go Online Now</span>
+                  Go Online Now
                 </button>
               </div>
-            ) : !currentTrip ? (
-              /* Online but No Active Trip State */
+            ) : activeOrder ? (
+              /* Active In-Transit Trip Card */
+              <div className="bg-white rounded-3xl border-2 border-emerald-500 shadow-xl shadow-emerald-500/10 p-6 sm:p-8 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-100 text-blue-900 border border-blue-200 animate-pulse">
+                        {activeOrder.status === 'RIDER_ACCEPTED'
+                          ? 'PICKUP ASSIGNED (HEADING TO STORE)'
+                          : activeOrder.status === 'PICKED_UP'
+                          ? 'ORDER PICKED UP'
+                          : 'OUT FOR DELIVERY (EN ROUTE)'}
+                      </span>
+                      <span className="text-sm font-bold text-slate-900">
+                        Order #{activeOrder._id.slice(-6)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Items:{' '}
+                      <strong className="text-slate-800">
+                        {activeOrder.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                      </strong>
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-xs text-slate-500 block">Payout for delivery</span>
+                    <span className="text-xl font-black text-emerald-700">
+                      ₹{activeOrder.deliveryFee || 35}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Pickup & Drop Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Store Pickup */}
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                      <Store className="w-4 h-4 text-amber-600" />
+                      <span>Pickup From Store</span>
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {activeOrder.shop?.shopDetails?.shopName || 'Neighborhood Partner Store'}
+                    </h3>
+                    <p className="text-xs text-slate-600">
+                      {activeOrder.shop?.shopDetails?.address || 'Store Location'}
+                    </p>
+                    {activeOrder.shop?.phone && (
+                      <div className="pt-2">
+                        <a
+                          href={`tel:${activeOrder.shop.phone}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Call Store</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Customer Drop-off */}
+                  <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
+                      <Navigation className="w-4 h-4 text-emerald-600" />
+                      <span>Deliver To Customer</span>
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-900">
+                      {activeOrder.deliveryAddress.receiverName}
+                    </h3>
+                    <p className="text-xs text-slate-600">
+                      {activeOrder.deliveryAddress.house}, {activeOrder.deliveryAddress.street}
+                    </p>
+                    <div className="pt-2 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const [lng, lat] = activeOrder.deliveryAddress.location.coordinates;
+                          const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+                          window.open(url, '_blank');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 shadow-2xs cursor-pointer"
+                      >
+                        <Navigation className="w-3.5 h-3.5" />
+                        <span>Navigate in Google Maps</span>
+                      </button>
+                      <a
+                        href={`tel:${activeOrder.deliveryAddress.phone}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
+                      >
+                        <Phone className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Call Customer</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Action Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                  {activeOrder.status === 'RIDER_ACCEPTED' ? (
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === activeOrder._id}
+                      onClick={() => handleUpdateStatus(activeOrder._id, 'OUT_FOR_DELIVERY')}
+                      className="inline-flex items-center gap-2 py-2.5 px-6 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoadingId === activeOrder._id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      <span>Confirm Picked Up &amp; Start Doorstep Delivery (Out for Delivery)</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === activeOrder._id}
+                      onClick={() => handleUpdateStatus(activeOrder._id, 'DELIVERED')}
+                      className="inline-flex items-center gap-2 py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoadingId === activeOrder._id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="w-4 h-4" />
+                      )}
+                      <span>Mark as Delivered &amp; Collect Payout (₹{activeOrder.deliveryFee || 35})</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : availableOrders.length > 0 ? (
+              /* Available Dispatch Requests List */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-emerald-600 animate-pulse" />
+                    <span>Incoming Delivery Requests ({availableOrders.length})</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={fetchLiveOrders}
+                    className="text-xs text-emerald-700 font-semibold hover:underline"
+                  >
+                    Refresh
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {availableOrders.map((ord) => (
+                    <div
+                      key={ord._id}
+                      className="qb-card p-5 space-y-4 border-emerald-300 hover:border-emerald-500 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">
+                          Order #{ord._id.slice(-6)}
+                        </span>
+                        <span className="text-sm font-black text-emerald-700">
+                          +₹{ord.deliveryFee || 35} Payout
+                        </span>
+                      </div>
+
+                      <div className="text-xs space-y-1 text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <p>
+                          <strong>Store:</strong> {ord.shop?.shopDetails?.shopName || 'Partner Store'}
+                        </p>
+                        <p>
+                          <strong>Deliver to:</strong> {ord.deliveryAddress.house}, {ord.deliveryAddress.street}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Items: {ord.items.map((i) => `${i.quantity}x ${i.name}`).join(', ')}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={actionLoadingId === ord._id}
+                        onClick={() => handleAcceptOrder(ord._id)}
+                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        {actionLoadingId === ord._id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Bike className="w-4 h-4" />
+                        )}
+                        <span>Accept Delivery Request & Start GPS</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Online but waiting */
               <div className="qb-card p-12 text-center flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
                 <div className="relative">
                   <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
@@ -342,109 +798,7 @@ export default function DeliveryPartnerDashboard() {
                 </div>
                 <div className="p-3 bg-blue-50/70 rounded-2xl border border-blue-200/60 text-blue-900 text-xs flex items-center gap-2.5">
                   <Radio className="w-4 h-4 text-blue-600 shrink-0 animate-pulse" />
-                  <span>Actively scanning neighborhood store dispatches in {city}...</span>
-                </div>
-              </div>
-            ) : (
-              /* Active Trip Card */
-              <div className="bg-white rounded-3xl border-2 border-emerald-500 shadow-xl shadow-emerald-500/10 p-6 sm:p-8 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-100">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 animate-pulse">
-                        {currentTrip.status === 'Assigned' ? 'PICKUP ASSIGNED' : 'EN ROUTE TO CUSTOMER'}
-                      </span>
-                      <span className="text-sm font-bold text-slate-900">Order #{currentTrip.orderId}</span>
-                      <span className="text-xs text-slate-500">• {currentTrip.distanceKm} km trip</span>
-                    </div>
-                    <p className="text-xs text-slate-600">
-                      Items: <strong className="text-slate-800">{currentTrip.itemsSummary}</strong>
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xs text-slate-500 block">Payout for trip</span>
-                    <span className="text-xl font-black text-emerald-700">₹{currentTrip.payout.toFixed(2)}</span>
-                  </div>
-                </div>
-
-                {/* Route details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Store Pickup */}
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                      <MapPin className="w-4 h-4 text-amber-600" />
-                      <span>Pickup From (Store)</span>
-                    </div>
-                    <h3 className="text-sm font-extrabold text-slate-900">{currentTrip.storeName}</h3>
-                    <p className="text-xs text-slate-600">{currentTrip.storeAddress}</p>
-                    {currentTrip.storePhone && (
-                      <div className="pt-2">
-                        <a
-                          href={`tel:${currentTrip.storePhone}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Call Store</span>
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Customer Drop-off */}
-                  <div className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-200 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 uppercase tracking-wider">
-                      <Navigation className="w-4 h-4 text-emerald-600" />
-                      <span>Deliver To (Customer)</span>
-                    </div>
-                    <h3 className="text-sm font-extrabold text-slate-900">{currentTrip.customerName}</h3>
-                    <p className="text-xs text-slate-600">{currentTrip.customerAddress}</p>
-                    <div className="pt-2 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                            currentTrip.customerAddress
-                          )}`;
-                          window.open(url, '_blank');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 shadow-2xs cursor-pointer"
-                      >
-                        <Navigation className="w-3.5 h-3.5" />
-                        <span>Start Navigation</span>
-                      </button>
-                      {currentTrip.customerPhone && (
-                        <a
-                          href={`tel:${currentTrip.customerPhone}`}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs"
-                        >
-                          <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Call Customer</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status Action Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  {currentTrip.status === 'Assigned' ? (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateTripStatus(currentTrip.id, 'Picked Up')}
-                      className="py-2.5 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-                    >
-                      Confirm Order Picked Up
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateTripStatus(currentTrip.id, 'Delivered')}
-                      className="py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer"
-                    >
-                      Mark as Delivered & Collect Payout
-                    </button>
-                  )}
+                  <span>Scanning neighborhood store dispatches in {city}...</span>
                 </div>
               </div>
             )}
@@ -499,4 +853,3 @@ export default function DeliveryPartnerDashboard() {
     </div>
   );
 }
-

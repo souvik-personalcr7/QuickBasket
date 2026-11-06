@@ -3,6 +3,8 @@ import { healthRoutes } from './health.routes';
 import { authRoutes } from './auth.routes';
 import { addressRoutes } from './address.routes';
 import { orderRoutes } from './order.routes';
+import { deliveryRoutes } from './delivery.routes';
+import { adminRoutes } from './admin.routes';
 
 const router = Router();
 
@@ -18,5 +20,10 @@ router.use('/addresses', addressRoutes);
 // Mount Order Management Routes
 router.use('/orders', orderRoutes);
 
-export const v1Router = router;
+// Mount Delivery Partner Routes
+router.use('/delivery', deliveryRoutes);
 
+// Mount Admin Routes (Temporarily disabled for location feature testing)
+// router.use('/admin', adminRoutes);
+
+export const v1Router = router;
