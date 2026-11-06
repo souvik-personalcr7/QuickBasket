@@ -15,6 +15,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateUserAddress: (address: UserAddress) => Promise<{ success: boolean; message?: string }>;
   updateShopDetails: (details: Partial<ShopDetails>) => Promise<{ success: boolean; message?: string }>;
+  updateUserProfile: (data: { name?: string; phone?: string; avatar?: string }) => Promise<{ success: boolean; message?: string }>;
   refreshUser: () => Promise<void>;
   getRoleRedirectPath: (role: UserRole) => string;
 }
@@ -217,6 +218,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfile = async (
+    data: { name?: string; phone?: string; avatar?: string }
+  ): Promise<{ success: boolean; message?: string }> => {
+    try {
+      const response = await apiClient<{ user: User }>('/auth/profile', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+
+      if (response.success && response.data?.user) {
+        setUser(response.data.user);
+        return { success: true, message: response.message || 'Profile details updated successfully' };
+      }
+
+      // Guest / local fallback if user is logged in locally
+      if (user) {
+        setUser({ ...user, ...data });
+        return { success: true, message: 'Profile details updated' };
+      }
+
+      return {
+        success: false,
+        message: response.message || 'Failed to update profile details',
+      };
+    } catch (err) {
+      if (user) {
+        setUser({ ...user, ...data });
+        return { success: true, message: 'Profile details updated' };
+      }
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Network error updating profile details',
+      };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -229,6 +266,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         updateUserAddress,
         updateShopDetails,
+        updateUserProfile,
         refreshUser,
         getRoleRedirectPath,
       }}

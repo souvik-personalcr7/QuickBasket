@@ -97,12 +97,14 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   };
 
   const pathname = usePathname();
-  const isShopInterface = pathname === '/shop' || (pathname ? pathname.startsWith('/shop/') : false);
-  const isDeliveryInterface = pathname === '/delivery' || (pathname ? pathname.startsWith('/delivery/') : false);
+  const isShopActive = pathname === '/shop' || (pathname ? pathname.startsWith('/shop/') : false);
+  const isAddressesActive = pathname === '/addresses' || (pathname ? pathname.startsWith('/addresses/') : false);
+  const isProfileActive = pathname === '/profile' || (pathname ? pathname.startsWith('/profile/') : false);
+  const isDeliveryActive = pathname === '/delivery' || (pathname ? pathname.startsWith('/delivery/') : false);
 
   const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
   const isShopOwner = mounted && isAuthenticated && role === 'shop_owner';
-  const isStaffPortal = (isDeliveryPartner && isDeliveryInterface) || (isShopOwner && isShopInterface);
+  const isStaffPortal = isDeliveryPartner || isShopOwner;
 
   return (
     <>
@@ -144,14 +146,14 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 </div>
               </Link>
 
-              {isDeliveryPartner && isDeliveryInterface && (
+              {isDeliveryPartner && (
                 <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <Bike className="w-3.5 h-3.5 text-emerald-700" />
                   <span>Rider</span>
                 </span>
               )}
 
-              {isShopOwner && isShopInterface && (
+              {isShopOwner && (
                 <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                   <Store className="w-3.5 h-3.5 text-emerald-700" />
                   <span>Merchant</span>
@@ -160,35 +162,62 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
             </div>
 
             {/* Desktop Navigation Links: Delivery vs Shop Owner vs Customer */}
-            {isDeliveryPartner && isDeliveryInterface ? (
-              <nav className="hidden md:flex items-center gap-4">
+            {isDeliveryPartner ? (
+              <nav className="hidden md:flex items-center gap-3">
                 <Link
                   href="/delivery"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#15803d] text-white shadow-xs hover:bg-[#166534] transition-colors"
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    isDeliveryActive
+                      ? 'bg-[#15803d] text-white shadow-xs'
+                      : 'text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200'
+                  }`}
                 >
                   <Bike className="w-4 h-4" />
                   <span>Rider Dispatch Board</span>
                 </Link>
                 <Link
                   href="/profile"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    isProfileActive
+                      ? 'bg-emerald-100 text-[#15803d] border border-emerald-200 font-bold'
+                      : 'text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200'
+                  }`}
                 >
                   <UserIcon className="w-3.5 h-3.5 text-slate-500" />
                   <span>Rider Details</span>
                 </Link>
               </nav>
-            ) : isShopOwner && isShopInterface ? (
-              <nav className="hidden md:flex items-center gap-4">
+            ) : isShopOwner ? (
+              <nav className="hidden md:flex items-center gap-3">
                 <Link
                   href="/shop"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-[#15803d] text-white shadow-xs hover:bg-[#166534] transition-colors"
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-colors ${
+                    isShopActive
+                      ? 'bg-[#15803d] text-white shadow-xs'
+                      : 'text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200'
+                  }`}
                 >
                   <Store className="w-4 h-4" />
                   <span>Store Catalog & Orders</span>
                 </Link>
                 <Link
+                  href="/addresses"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    isAddressesActive
+                      ? 'bg-emerald-100 text-[#15803d] border border-emerald-200 font-bold'
+                      : 'text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200'
+                  }`}
+                >
+                  <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Shop Locations</span>
+                </Link>
+                <Link
                   href="/profile"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200 transition-colors"
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                    isProfileActive
+                      ? 'bg-emerald-100 text-[#15803d] border border-emerald-200 font-bold'
+                      : 'text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 border border-transparent hover:border-emerald-200'
+                  }`}
                 >
                   <UserIcon className="w-3.5 h-3.5 text-slate-500" />
                   <span>Store Details</span>
@@ -400,7 +429,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
               )}
 
               {/* Mobile Links: Delivery vs Shop Owner vs Customer */}
-              {isDeliveryPartner && isDeliveryInterface ? (
+              {isDeliveryPartner ? (
                 <nav className="mt-4 space-y-2">
                   <Link
                     href="/delivery"
@@ -419,7 +448,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                     <span>Rider Fleet Profile</span>
                   </Link>
                 </nav>
-              ) : isShopOwner && isShopInterface ? (
+              ) : isShopOwner ? (
                 <nav className="mt-4 space-y-2">
                   <Link
                     href="/shop"
@@ -430,12 +459,20 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                     <span>Store Catalog & Orders</span>
                   </Link>
                   <Link
+                    href="/addresses"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-50"
+                  >
+                    <MapPin className="w-4 h-4 text-slate-500" />
+                    <span>Shop Locations</span>
+                  </Link>
+                  <Link
                     href="/profile"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2.5 text-sm font-semibold rounded-xl text-slate-700 hover:bg-slate-50"
                   >
                     <UserIcon className="w-4 h-4 text-slate-500" />
-                    <span>Storefront Profile</span>
+                    <span>Storefront Profile & Details</span>
                   </Link>
                 </nav>
               ) : (

@@ -52,7 +52,14 @@ export const updateShopDetailsSchema = z.object({
   image: z.string().optional(),
 });
 
+export const updateProfileSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name cannot exceed 100 characters').optional(),
+  phone: z.string().min(8, 'Phone number must be at least 8 digits').optional(),
+  avatar: z.string().optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateAddressInput = z.infer<typeof updateAddressSchema>;
 export type UpdateShopDetailsInput = z.infer<typeof updateShopDetailsSchema>;
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;

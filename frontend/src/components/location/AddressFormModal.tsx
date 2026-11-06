@@ -13,6 +13,7 @@ import {
   Building,
   User,
   Phone,
+  Store,
 } from 'lucide-react';
 import { Address, AddressFormData, AddressLabel } from '@/types/address';
 import { createAddress, updateAddress } from '@/lib/addressApi';
@@ -25,6 +26,7 @@ interface AddressFormModalProps {
   onSaved: (address: Address) => void;
   defaultReceiverName?: string;
   defaultPhone?: string;
+  defaultShopName?: string;
   isShopOwner?: boolean;
 }
 
@@ -35,10 +37,12 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
   onSaved,
   defaultReceiverName = '',
   defaultPhone = '',
+  defaultShopName = '',
   isShopOwner = false,
 }) => {
   const isEditing = !!initialAddress?._id;
 
+  const [shopName, setShopName] = useState('');
   const [receiverName, setReceiverName] = useState('');
   const [phone, setPhone] = useState('');
   const [house, setHouse] = useState('');
@@ -58,31 +62,33 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     if (isOpen) {
       setErrorMsg(null);
       if (initialAddress) {
+        setShopName(initialAddress.shopName || defaultShopName || '');
         setReceiverName(initialAddress.receiverName || '');
         setPhone(initialAddress.phone || '');
         setHouse(initialAddress.house || '');
         setStreet(initialAddress.street || '');
         setLandmark(initialAddress.landmark || '');
-        setLabel(initialAddress.label || 'Home');
+        setLabel(initialAddress.label || (isShopOwner ? 'Work' : 'Home'));
         setIsDefault(!!initialAddress.isDefault);
         const [lng, lat] = initialAddress.location?.coordinates || [77.209, 28.6139];
         setLongitude(lng);
         setLatitude(lat);
         setFormattedAddress(initialAddress.formattedAddress || '');
       } else {
+        setShopName(defaultShopName || '');
         setReceiverName(defaultReceiverName);
         setPhone(defaultPhone);
         setHouse('');
         setStreet('');
         setLandmark('');
-        setLabel('Home');
+        setLabel(isShopOwner ? 'Work' : 'Home');
         setIsDefault(false);
         setLatitude(28.6139);
         setLongitude(77.209);
         setFormattedAddress('');
       }
     }
-  }, [isOpen, initialAddress, defaultReceiverName, defaultPhone]);
+  }, [isOpen, initialAddress, defaultReceiverName, defaultPhone, defaultShopName, isShopOwner]);
 
   if (!isOpen) return null;
 
@@ -107,32 +113,56 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!receiverName.trim()) {
-      setErrorMsg('Please enter the receiver name');
-      return;
-    }
-    if (!phone.trim() || phone.trim().length < 8) {
-      setErrorMsg('Please enter a valid phone number (at least 8 digits)');
-      return;
-    }
-    if (!house.trim()) {
-      setErrorMsg('Please enter House / Flat / Building / Floor');
-      return;
-    }
-    if (!street.trim()) {
-      setErrorMsg('Please enter Street / Area / Locality');
-      return;
+    if (isShopOwner) {
+      if (!shopName.trim()) {
+        setErrorMsg('Please enter your Shop / Store name');
+        return;
+      }
+      if (!receiverName.trim()) {
+        setErrorMsg('Please enter the Shop Owner full name');
+        return;
+      }
+      if (!phone.trim() || phone.trim().length < 8) {
+        setErrorMsg('Please enter a valid store contact phone number (at least 8 digits)');
+        return;
+      }
+      if (!house.trim()) {
+        setErrorMsg('Please enter Shop No. / Unit / Building details');
+        return;
+      }
+      if (!street.trim()) {
+        setErrorMsg('Please enter Market / Street / Locality');
+        return;
+      }
+    } else {
+      if (!receiverName.trim()) {
+        setErrorMsg('Please enter the receiver name');
+        return;
+      }
+      if (!phone.trim() || phone.trim().length < 8) {
+        setErrorMsg('Please enter a valid phone number (at least 8 digits)');
+        return;
+      }
+      if (!house.trim()) {
+        setErrorMsg('Please enter House / Flat / Building / Floor');
+        return;
+      }
+      if (!street.trim()) {
+        setErrorMsg('Please enter Street / Area / Locality');
+        return;
+      }
     }
 
     setIsSubmitting(true);
 
     const payload: AddressFormData = {
+      shopName: isShopOwner ? shopName.trim() : undefined,
       receiverName: receiverName.trim(),
       phone: phone.trim(),
       house: house.trim(),
       street: street.trim(),
       landmark: landmark.trim(),
-      label,
+      label: isShopOwner ? 'Work' : label,
       latitude,
       longitude,
       formattedAddress: formattedAddress.trim(),
@@ -177,7 +207,11 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
         <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-              <MapPin className="w-5 h-5 text-emerald-700" />
+              {isShopOwner ? (
+                <Store className="w-5 h-5 text-emerald-700" />
+              ) : (
+                <MapPin className="w-5 h-5 text-emerald-700" />
+              )}
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight">
@@ -241,138 +275,287 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
             )}
           </div>
 
-          {/* Section 2: Address Details Form */}
+          {/* Section 2: Address / Shop Details Form */}
           <form id="address-form" onSubmit={handleSubmit} className="space-y-4">
-            <div className="pt-2 border-t border-slate-100">
-              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
-                {isShopOwner ? '2. Complete Shop Location Details' : '2. Complete Doorstep Delivery Address'}
-              </h3>
-
-              {/* Label Chips: Home / Work / Other */}
-              <div className="mb-4">
-                <span className="block text-xs font-medium text-slate-600 mb-1.5">
-                  Save Address As
-                </span>
-                <div className="flex items-center gap-2">
-                  {(['Home', 'Work', 'Other'] as AddressLabel[]).map((lbl) => {
-                    const isSelected = label === lbl;
-                    const Icon = lbl === 'Home' ? Home : lbl === 'Work' ? Briefcase : MapPin;
-                    return (
-                      <button
-                        key={lbl}
-                        type="button"
-                        onClick={() => setLabel(lbl)}
-                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-[#15803d] text-white shadow-sm ring-2 ring-emerald-200'
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                      >
-                        <Icon className="w-3.5 h-3.5" />
-                        <span>{lbl}</span>
-                      </button>
-                    );
-                  })}
+            {isShopOwner ? (
+              /* SHOP OWNER FORM: ONLY SHOP DETAILS AND SHOP OWNER NAME DETAILS */
+              <div className="pt-2 border-t border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Store className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>2. Shop Details & Shop Owner Information</span>
+                  </h3>
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                    Storefront
+                  </span>
                 </div>
-              </div>
 
-              {/* Grid: Receiver Name & Phone Number */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
+                {/* Section A: Shop Owner Name Details */}
+                <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/90 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    <User className="w-4 h-4 text-emerald-700" />
+                    <span>Shop Owner Information</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Shop Owner Full Name <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="text"
+                          required
+                          value={receiverName}
+                          onChange={(e) => setReceiverName(e.target.value)}
+                          placeholder="e.g. Souvik Biswas"
+                          className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-medium text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-700 mb-1">
+                        Shop Contact Phone <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                        <input
+                          type="tel"
+                          required
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="e.g. 9876543210"
+                          className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-medium text-slate-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section B: Shop Details */}
+                <div className="bg-emerald-50/30 rounded-2xl p-4 border border-emerald-100/90 space-y-3">
+                  <div className="flex items-center gap-2 text-xs font-bold text-emerald-900 uppercase tracking-wider">
+                    <Store className="w-4 h-4 text-emerald-700" />
+                    <span>Shop Details</span>
+                  </div>
+
+                  {/* Shop Name */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Shop / Store Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Store className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        required
+                        value={shopName}
+                        onChange={(e) => setShopName(e.target.value)}
+                        placeholder="e.g. Biswas shop"
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 font-bold text-slate-900"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Shop No / Floor / Building */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Shop No. / Unit / Building / Floor <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Building className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        required
+                        value={house}
+                        onChange={(e) => setHouse(e.target.value)}
+                        placeholder="e.g. Shop No. 12, Ground Floor, Market Complex"
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Market / Street / Locality */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Market / Street / Locality <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        required
+                        value={street}
+                        onChange={(e) => setStreet(e.target.value)}
+                        placeholder="e.g. Station Road, Gobardanga"
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Nearby Landmark */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Nearby Landmark / Market Gate <span className="text-slate-400 text-[11px]">(Optional)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      placeholder="e.g. Opposite Central Bank or Near Station Gate 1"
+                      className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                {/* Primary Shop Location Checkbox */}
+                <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isDefault}
+                    onChange={(e) => setIsDefault(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-slate-700">
+                    Set as my primary shop location
+                  </span>
+                </label>
+              </div>
+            ) : (
+              /* CUSTOMER FORM: DELIVERY ADDRESS */
+              <div className="pt-2 border-t border-slate-100">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3">
+                  2. Complete Doorstep Delivery Address
+                </h3>
+
+                {/* Label Chips: Home / Work / Other */}
+                <div className="mb-4">
+                  <span className="block text-xs font-medium text-slate-600 mb-1.5">
+                    Save Address As
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {(['Home', 'Work', 'Other'] as AddressLabel[]).map((lbl) => {
+                      const isSelected = label === lbl;
+                      const Icon = lbl === 'Home' ? Home : lbl === 'Work' ? Briefcase : MapPin;
+                      return (
+                        <button
+                          key={lbl}
+                          type="button"
+                          onClick={() => setLabel(lbl)}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#15803d] text-white shadow-sm ring-2 ring-emerald-200'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{lbl}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Grid: Receiver Name & Phone Number */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Receiver Full Name <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        required
+                        value={receiverName}
+                        onChange={(e) => setReceiverName(e.target.value)}
+                        placeholder="e.g. John Doe"
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                      Contact Phone Number <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="tel"
+                        required
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="e.g. 9876543210"
+                        className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* House / Flat / Building */}
+                <div className="mb-3">
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Receiver Full Name <span className="text-red-500">*</span>
+                    Flat / House No. / Building / Floor <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <Building className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     <input
                       type="text"
                       required
-                      value={receiverName}
-                      onChange={(e) => setReceiverName(e.target.value)}
-                      placeholder="e.g. John Doe"
+                      value={house}
+                      onChange={(e) => setHouse(e.target.value)}
+                      placeholder="e.g. Flat 402, Lotus Residency, 4th Floor"
                       className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                     />
                   </div>
                 </div>
 
-                <div>
+                {/* Street / Area / Locality */}
+                <div className="mb-3">
                   <label className="block text-xs font-medium text-slate-700 mb-1">
-                    Contact Phone Number <span className="text-red-500">*</span>
+                    Street / Area / Locality <span className="text-red-500">*</span>
                   </label>
-                  <div className="relative">
-                    <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                    <input
-                      type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="e.g. 9876543210"
-                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* House / Flat / Building */}
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Flat / House No. / Building / Floor <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <Building className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                   <input
                     type="text"
                     required
-                    value={house}
-                    onChange={(e) => setHouse(e.target.value)}
-                    placeholder="e.g. Flat 402, Lotus Residency, 4th Floor"
-                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                    value={street}
+                    onChange={(e) => setStreet(e.target.value)}
+                    placeholder="e.g. 5th Main, Sector 4, Indiranagar"
+                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                   />
                 </div>
-              </div>
 
-              {/* Street / Area / Locality */}
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Street / Area / Locality <span className="text-red-500">*</span>
+                {/* Landmark (Optional) */}
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Nearby Landmark <span className="text-slate-400 text-[11px]">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                    placeholder="e.g. Opposite City Hospital or Near Green Park Metro"
+                    className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
+
+                {/* Set as Default Address Checkbox */}
+                <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isDefault}
+                    onChange={(e) => setIsDefault(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                  />
+                  <span className="text-xs font-medium text-slate-700">
+                    Set as my default delivery address
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                  placeholder="e.g. 5th Main, Sector 4, Indiranagar"
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                />
               </div>
-
-              {/* Landmark (Optional) */}
-              <div className="mb-3">
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Nearby Landmark <span className="text-slate-400 text-[11px]">(Optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={landmark}
-                  onChange={(e) => setLandmark(e.target.value)}
-                  placeholder="e.g. Opposite City Hospital or Near Green Park Metro"
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-
-              {/* Set as Default Address Checkbox */}
-              <label className="flex items-center gap-2.5 pt-1 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={isDefault}
-                  onChange={(e) => setIsDefault(e.target.checked)}
-                  className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
-                />
-                <span className="text-xs font-medium text-slate-700">
-                  {isShopOwner ? 'Set as my primary shop location' : 'Set as my default delivery address'}
-                </span>
-              </label>
-            </div>
+            )}
           </form>
         </div>
 
@@ -416,4 +599,3 @@ export const AddressFormModal: React.FC<AddressFormModalProps> = ({
     </div>
   );
 };
-

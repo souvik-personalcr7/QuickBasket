@@ -9,6 +9,7 @@ export interface IGeoPoint {
 
 export interface IAddress extends Document {
   user: Types.ObjectId;
+  shopName?: string;
   receiverName: string;
   phone: string;
   house: string;
@@ -29,6 +30,12 @@ const AddressSchema = new Schema<IAddress>(
       ref: 'User',
       required: [true, 'User reference is required'],
       index: true,
+    },
+    shopName: {
+      type: String,
+      trim: true,
+      maxlength: [100, 'Shop name cannot exceed 100 characters'],
+      default: '',
     },
     receiverName: {
       type: String,

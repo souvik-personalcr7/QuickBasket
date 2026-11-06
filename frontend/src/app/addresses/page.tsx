@@ -18,6 +18,7 @@ import {
   AlertCircle,
   ShieldCheck,
   Store,
+  User,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Address, AddressLabel } from '@/types/address';
@@ -286,15 +287,7 @@ export default function AddressesPage() {
             const isDefault = !!addr.isDefault;
             const [lng, lat] = addr.location?.coordinates || [0, 0];
 
-            if (authLoading || !user) {
-    return (
-      <div className="min-h-[70vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return (
+            return (
               <div
                 key={addr._id}
                 className={`bg-white rounded-3xl border p-5 sm:p-6 shadow-xs flex flex-col justify-between transition-all relative ${
@@ -307,10 +300,16 @@ export default function AddressesPage() {
                   {/* Top Badges */}
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-2">
-                      {getLabelBadge(addr.label)}
+                      {isShopOwner ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <Store className="w-3 h-3 text-emerald-700" /> Shop Location
+                        </span>
+                      ) : (
+                        getLabelBadge(addr.label)
+                      )}
                       {isDefault && (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> Default Address
+                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {isShopOwner ? 'Primary Shop Location' : 'Default Address'}
                         </span>
                       )}
                     </div>
@@ -320,12 +319,29 @@ export default function AddressesPage() {
                     </span>
                   </div>
 
-                  {/* Receiver & Contact */}
+                  {/* Receiver & Contact / Shop Info */}
                   <div className="space-y-1 mb-2.5">
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900">
-                      {addr.receiverName}
-                    </h3>
-                    <p className="text-xs font-semibold text-slate-600">{addr.phone}</p>
+                    {isShopOwner ? (
+                      <>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
+                          <Store className="w-4 h-4 text-emerald-700 shrink-0" />
+                          <span>{addr.shopName || user?.shopDetails?.shopName || 'Registered Shop'}</span>
+                        </h3>
+                        <p className="text-xs font-medium text-slate-600 flex items-center gap-1">
+                          <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>Owner: {addr.receiverName}</span>
+                          <span className="text-slate-300">•</span>
+                          <span>{addr.phone}</span>
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                          {addr.receiverName}
+                        </h3>
+                        <p className="text-xs font-semibold text-slate-600">{addr.phone}</p>
+                      </>
+                    )}
                   </div>
 
                   {/* Detailed Doorstep Address */}
@@ -410,6 +426,7 @@ export default function AddressesPage() {
         onSaved={handleSaved}
         defaultReceiverName={user?.name || ''}
         defaultPhone={user?.phone || ''}
+        defaultShopName={user?.shopDetails?.shopName || ''}
         isShopOwner={isShopOwner}
       />
     </div>

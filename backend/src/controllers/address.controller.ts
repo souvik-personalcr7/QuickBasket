@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { Address } from '../models/Address';
+import { User } from '../models/User';
 import { createAddressSchema, updateAddressSchema } from '../validators/address.validator';
 import { AppError } from '../utils/appError';
 import { sendResponse } from '../utils/apiResponse';
@@ -60,6 +61,7 @@ export const createAddress = async (
 
     const newAddress = await Address.create({
       user: userId,
+      shopName: input.shopName || '',
       receiverName: input.receiverName,
       phone: input.phone,
       house: input.house,
@@ -73,6 +75,15 @@ export const createAddress = async (
       formattedAddress: input.formattedAddress || '',
       isDefault: shouldBeDefault,
     });
+
+    if (req.user?.role === 'shop_owner' && input.shopName) {
+      await User.findByIdAndUpdate(userId, {
+        $set: {
+          'shopDetails.shopName': input.shopName,
+          'shopDetails.address': `${input.house}, ${input.street}`,
+        },
+      });
+    }
 
     sendResponse(res, {
       statusCode: 201,
@@ -121,6 +132,7 @@ export const updateAddress = async (
       address.isDefault = true;
     }
 
+    if (input.shopName !== undefined) address.shopName = input.shopName;
     if (input.receiverName !== undefined) address.receiverName = input.receiverName;
     if (input.phone !== undefined) address.phone = input.phone;
     if (input.house !== undefined) address.house = input.house;
@@ -137,6 +149,15 @@ export const updateAddress = async (
     }
 
     await address.save();
+
+    if (req.user?.role === 'shop_owner' && (input.shopName || input.house || input.street)) {
+      const updateFields: Record<string, string> = {};
+      if (input.shopName) updateFields['shopDetails.shopName'] = input.shopName;
+      if (input.house || input.street) {
+        updateFields['shopDetails.address'] = `${address.house}, ${address.street}`;
+      }
+      await User.findByIdAndUpdate(userId, { $set: updateFields });
+    }
 
     sendResponse(res, {
       statusCode: 200,

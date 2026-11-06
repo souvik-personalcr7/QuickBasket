@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const createAddressSchema = z.object({
+  shopName: z.string().max(100, 'Shop name cannot exceed 100 characters').optional().default(''),
   receiverName: z
     .string({ required_error: 'Receiver name is required' })
     .min(2, 'Receiver name must be at least 2 characters')

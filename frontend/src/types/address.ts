@@ -8,6 +8,7 @@ export interface IAddressLocation {
 export interface Address {
   _id: string;
   user?: string;
+  shopName?: string;
   receiverName: string;
   phone: string;
   house: string;
@@ -22,6 +23,7 @@ export interface Address {
 }
 
 export interface AddressFormData {
+  shopName?: string;
   receiverName: string;
   phone: string;
   house: string;
