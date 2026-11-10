@@ -1338,7 +1338,10 @@ export default function ShopOwnerDashboard() {
               <Package className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-2xl font-black text-slate-900">{products.length} Items</p>
+          <p className="text-2xl font-black text-slate-900 whitespace-nowrap inline-flex items-center gap-1.5">
+            <span>{products.length}</span>
+            <span>{products.length === 1 ? 'Item' : 'Items'}</span>
+          </p>
           <span className="text-xs text-slate-500 font-medium mt-1 inline-block">
             {products.length > 0
               ? `${inStockCount} active in stock`

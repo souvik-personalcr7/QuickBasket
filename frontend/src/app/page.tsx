@@ -486,33 +486,34 @@ export default function CustomerHomePage() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-xl sm:text-2xl font-black text-[#0f3d23] tracking-tight">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                    <h3 className="text-base sm:text-2xl font-black text-[#0f3d23] tracking-tight truncate sm:whitespace-normal">
                       Products from {selectedShop.name}
                     </h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                      {selectedShopProducts.length} {selectedShopProducts.length === 1 ? 'item' : 'items'}
+                    <span className="self-start sm:self-auto whitespace-nowrap shrink-0 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <span>{selectedShopProducts.length}</span>
+                      <span>{selectedShopProducts.length === 1 ? 'item' : 'items'}</span>
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1 sm:line-clamp-none">
                     Browse authentic products added directly by this neighborhood store owner
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 self-start sm:self-auto">
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsShopModalOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-800 shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
                   Open Full Storefront
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedShop(null)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0"
                 >
                   <X className="w-3.5 h-3.5" />
                   <span>Close</span>
@@ -522,7 +523,7 @@ export default function CustomerHomePage() {
 
             {/* Grid of products from this shop owner */}
             {selectedShopProducts.length > 0 ? (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3 sm:gap-4">
                 {selectedShopProducts.map((product) => (
                   <ProductCard
                     key={product.id}

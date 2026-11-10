@@ -153,9 +153,10 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
                     </span>
                   )}
 
-                  <span className="inline-flex items-center gap-1 bg-emerald-900/60 text-emerald-200 px-2 py-0.5 rounded-lg font-bold text-[11px]">
-                    <Package className="w-3 h-3" />
-                    {products.length} {products.length === 1 ? 'Product Listed' : 'Products Listed'}
+                  <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1 bg-emerald-900/60 text-emerald-200 px-2.5 py-0.5 rounded-lg font-bold text-[11px]">
+                    <Package className="w-3 h-3 shrink-0" />
+                    <span>{products.length}</span>
+                    <span>{products.length === 1 ? 'item' : 'items'}</span>
                   </span>
                 </div>
               </div>

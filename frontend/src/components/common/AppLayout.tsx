@@ -3,6 +3,7 @@
 import React from 'react';
 import { AuthProvider } from '@/context/AuthContext';
 import { CartProvider, useCart } from '@/context/CartContext';
+import { FavoritesProvider } from '@/context/FavoritesContext';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -23,9 +24,11 @@ const LayoutContent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <AuthProvider>
-      <CartProvider>
-        <LayoutContent>{children}</LayoutContent>
-      </CartProvider>
+      <FavoritesProvider>
+        <CartProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </CartProvider>
+      </FavoritesProvider>
     </AuthProvider>
   );
 };

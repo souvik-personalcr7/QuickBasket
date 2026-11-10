@@ -69,6 +69,17 @@ export const ShopCard: React.FC<ShopCardProps> = ({ shop, onSelect, isSelected }
             {shop.deliveryTime || '20-30 mins'}
           </span>
 
+          {/* Store Items Count Badge (Always in a single row on mobile and desktop) */}
+          {((typeof shop.productCount === 'number' && shop.productCount > 0) || (shop.products && shop.products.length > 0)) && (
+            <>
+              <span className="text-slate-300 text-xs shrink-0">•</span>
+              <span className="text-[11px] text-emerald-700 font-bold whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                <span>{shop.productCount || shop.products?.length}</span>
+                <span>{(shop.productCount || shop.products?.length) === 1 ? 'item' : 'items'}</span>
+              </span>
+            </>
+          )}
+
           {/* Free Delivery Tag */}
           {shop.isFreeDelivery && (
             <>

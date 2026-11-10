@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MapPin } from 'lucide-react';
+import { ShoppingBag, Menu, X, ShoppingCart, User as UserIcon, LogOut, Store, Bike, Shield, MapPin, Heart } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { useFavorites } from '@/context/FavoritesContext';
 import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
 
 interface HeaderProps {
@@ -21,6 +22,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { user, isAuthenticated, logout, role, getRoleRedirectPath } = useAuth();
+  const { favoritesCount } = useFavorites();
 
   useEffect(() => {
     setMounted(true);
@@ -113,16 +115,17 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
             
-            {/* Mobile Hamburger Menu Toggle */}
-            <div className="flex items-center md:hidden">
+            {/* Hamburger Menu Toggle (Opens Left Side Drawer) */}
+            <div className="flex items-center">
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   setMobileMenuOpen((prev) => !prev);
                 }}
-                className="p-2 text-slate-700 hover:text-emerald-700 focus:outline-none cursor-pointer touch-manipulation active:scale-95 transition-transform"
-                aria-label="Open menu"
+                className="p-2 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl focus:outline-none cursor-pointer touch-manipulation active:scale-95 transition-all"
+                aria-label="Open side drawer"
+                title="Open menu"
               >
                 {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
               </button>
@@ -349,6 +352,25 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                           </Link>
                         )}
 
+                        {/* Customer Favorites Link in Dropdown */}
+                        {user.role === 'customer' && (
+                          <Link
+                            href="/favorites"
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Heart className="w-4 h-4 text-rose-500 fill-rose-500/30" />
+                              <span>My Favorites</span>
+                            </div>
+                            {favoritesCount > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
+                                {favoritesCount}
+                              </span>
+                            )}
+                          </Link>
+                        )}
+
                         <Link
                           href="/profile"
                           onClick={() => setUserDropdownOpen(false)}
@@ -410,10 +432,10 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         </div>
       </header>
 
-      {/* Mobile Slide-Out Menu */}
+      {/* Slide-Out Left Drawer (Accessible on Mobile & Desktop) */}
       {mobileMenuOpen && (
         <div
-          className="md:hidden fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setMobileMenuOpen(false);
@@ -500,45 +522,77 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 </nav>
               ) : (
                 <nav className="mt-4 space-y-2">
+                  {/* Left Side Drawer Dedicated Option: Favorite */}
+                  <Link
+                    href="/favorites"
+                    onClick={() => {
+                      setActiveNav('Favorite');
+                      setMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center justify-between px-3.5 py-2.5 text-base font-semibold rounded-xl transition-all cursor-pointer ${
+                      pathname === '/favorites'
+                        ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200 shadow-2xs'
+                        : 'text-slate-700 hover:bg-rose-50/70 hover:text-rose-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <Heart
+                        className={`w-5 h-5 transition-transform ${
+                          favoritesCount > 0 ? 'text-rose-500 fill-rose-500' : 'text-slate-400'
+                        }`}
+                      />
+                      <span>Favorite</span>
+                    </div>
+                    {favoritesCount > 0 ? (
+                      <span className="px-2.5 py-0.5 text-xs font-bold bg-rose-500 text-white rounded-full shadow-2xs">
+                        {favoritesCount}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 font-normal">
+                        0
+                      </span>
+                    )}
+                  </Link>
+
                   {navLinks.map((link) => {
-                    if (link.name === 'Track Order') {
+                      if (link.name === 'Track Order') {
+                        return (
+                          <button
+                            key={link.name}
+                            type="button"
+                            onClick={() => {
+                              setActiveNav(link.name);
+                              setMobileMenuOpen(false);
+                              setIsTrackModalOpen(true);
+                            }}
+                            className={`w-full text-left block px-3 py-2 text-base font-semibold rounded-lg cursor-pointer ${
+                              activeNav === link.name
+                                ? 'bg-emerald-50 text-[#15803d]'
+                                : 'text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            {link.name}
+                          </button>
+                        );
+                      }
                       return (
-                        <button
+                        <Link
                           key={link.name}
-                          type="button"
+                          href={link.href}
                           onClick={() => {
                             setActiveNav(link.name);
                             setMobileMenuOpen(false);
-                            setIsTrackModalOpen(true);
                           }}
-                          className={`w-full text-left block px-3 py-2 text-base font-semibold rounded-lg cursor-pointer ${
+                          className={`block px-3 py-2 text-base font-semibold rounded-lg ${
                             activeNav === link.name
                               ? 'bg-emerald-50 text-[#15803d]'
                               : 'text-slate-700 hover:bg-slate-50'
                           }`}
                         >
                           {link.name}
-                        </button>
+                        </Link>
                       );
-                    }
-                    return (
-                      <Link
-                        key={link.name}
-                        href={link.href}
-                        onClick={() => {
-                          setActiveNav(link.name);
-                          setMobileMenuOpen(false);
-                        }}
-                        className={`block px-3 py-2 text-base font-semibold rounded-lg ${
-                          activeNav === link.name
-                            ? 'bg-emerald-50 text-[#15803d]'
-                            : 'text-slate-700 hover:bg-slate-50'
-                        }`}
-                      >
-                        {link.name}
-                      </Link>
-                    );
-                  })}
+                    })}
                 </nav>
               )}
             </div>

@@ -41,8 +41,10 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
     test('Customer can access customer homepage, cart, checkout, profile and addresses', () => {
       assert.deepEqual(evaluateRouteAccess('/', customerSession).action, 'allow');
       assert.deepEqual(evaluateRouteAccess('/cart', customerSession).action, 'allow');
+      assert.deepEqual(evaluateRouteAccess('/buy-now', customerSession).action, 'allow');
       assert.deepEqual(evaluateRouteAccess('/checkout', customerSession).action, 'allow');
       assert.deepEqual(evaluateRouteAccess('/orders', customerSession).action, 'allow');
+      assert.deepEqual(evaluateRouteAccess('/favorites', customerSession).action, 'allow');
       assert.deepEqual(evaluateRouteAccess('/profile', customerSession).action, 'allow');
       assert.deepEqual(evaluateRouteAccess('/addresses', customerSession).action, 'allow');
     });
@@ -91,6 +93,10 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       assert.equal(cartRes.action, 'redirect');
       assert.equal(cartRes.targetUrl, '/shop');
 
+      const buyNowRes = evaluateRouteAccess('/buy-now', shopOwnerSession);
+      assert.equal(buyNowRes.action, 'redirect');
+      assert.equal(buyNowRes.targetUrl, '/shop');
+
       const checkoutRes = evaluateRouteAccess('/checkout', shopOwnerSession);
       assert.equal(checkoutRes.action, 'redirect');
       assert.equal(checkoutRes.targetUrl, '/shop');
@@ -98,6 +104,10 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       const ordersRes = evaluateRouteAccess('/orders', shopOwnerSession);
       assert.equal(ordersRes.action, 'redirect');
       assert.equal(ordersRes.targetUrl, '/shop');
+
+      const favRes = evaluateRouteAccess('/favorites', shopOwnerSession);
+      assert.equal(favRes.action, 'redirect');
+      assert.equal(favRes.targetUrl, '/shop');
     });
 
     test('Shop Owner CANNOT access Delivery Partner routes and is redirected to /shop', () => {
@@ -129,6 +139,10 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       assert.equal(cartRes.action, 'redirect');
       assert.equal(cartRes.targetUrl, '/delivery');
 
+      const buyNowRes = evaluateRouteAccess('/buy-now', deliverySession);
+      assert.equal(buyNowRes.action, 'redirect');
+      assert.equal(buyNowRes.targetUrl, '/delivery');
+
       const checkoutRes = evaluateRouteAccess('/checkout', deliverySession);
       assert.equal(checkoutRes.action, 'redirect');
       assert.equal(checkoutRes.targetUrl, '/delivery');
@@ -136,6 +150,10 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
       const ordersRes = evaluateRouteAccess('/orders', deliverySession);
       assert.equal(ordersRes.action, 'redirect');
       assert.equal(ordersRes.targetUrl, '/delivery');
+
+      const favRes = evaluateRouteAccess('/favorites', deliverySession);
+      assert.equal(favRes.action, 'redirect');
+      assert.equal(favRes.targetUrl, '/delivery');
     });
 
     test('Delivery Partner CANNOT access Shop Owner routes and is redirected to /delivery', () => {
@@ -158,8 +176,9 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
   });
 
   describe('5. Unauthenticated User Access', () => {
-    test('Allows public browsing of homepage', () => {
+    test('Allows public browsing of homepage and favorites', () => {
       assert.equal(evaluateRouteAccess('/', null).action, 'allow');
+      assert.equal(evaluateRouteAccess('/favorites', null).action, 'allow');
     });
 
     test('Redirects unauthenticated users from protected routes to login with redirect param', () => {

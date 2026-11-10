@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Heart, ShoppingCart, Check, IndianRupee } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Heart, ShoppingBag, Check, IndianRupee, Eye } from 'lucide-react';
 import { Product } from '@/data/mockData';
+import { useFavorites } from '@/context/FavoritesContext';
+import { useCart } from '@/context/CartContext';
+import { ProductImageModal } from './ProductImageModal';
 
 interface ProductCardProps {
   product: Product;
@@ -10,19 +14,41 @@ interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
-  const [isFavorite, setIsFavorite] = useState(false);
+  const router = useRouter();
+  const { isFavorite: checkFavorite, toggleFavorite } = useFavorites();
+  const { addToCart } = useCart();
+  const isFavorite = checkFavorite(product.id);
   const [isAdded, setIsAdded] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const isOutOfStock = typeof product.stock === 'number' && product.stock <= 0;
 
-  const handleAdd = (e: React.MouseEvent) => {
-    e.preventDefault();
+  const handleBuyNow = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (isOutOfStock) return;
     setIsAdded(true);
-    onAddToCart?.(product);
-    setTimeout(() => {
-      setIsAdded(false);
-    }, 1200);
+    if (onAddToCart) {
+      onAddToCart(product);
+    } else {
+      addToCart(product);
+    }
+    // Navigate directly to the Buy Now / Checkout page
+    router.push('/buy-now');
+  };
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleFavorite(product);
+  };
+
+  const handleImageClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsImageModalOpen(true);
   };
 
   return (
@@ -35,30 +61,49 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         </span>
       )}
 
-      {/* Wishlist Button: Compact top-right badge */}
+      {/* Wishlist / Favorite Button: Compact top-right badge */}
       <button
         type="button"
-        onClick={() => setIsFavorite(!isFavorite)}
+        onClick={handleFavoriteClick}
         aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-        className={`absolute top-2 right-2 z-10 p-1 rounded-full transition-colors backdrop-blur-xs shadow-2xs ${
+        className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-all duration-200 backdrop-blur-xs shadow-2xs cursor-pointer ${
           isFavorite
-            ? 'text-rose-500 bg-rose-50/90'
-            : 'text-slate-400 bg-white/80 hover:text-rose-500 hover:bg-white'
+            ? 'text-rose-500 bg-rose-50/95 ring-1 ring-rose-200 scale-105'
+            : 'text-slate-400 bg-white/85 hover:text-rose-500 hover:bg-white hover:scale-105'
         }`}
       >
-        <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500' : ''}`} />
+        <Heart className={`w-3.5 h-3.5 transition-transform ${isFavorite ? 'fill-rose-500' : ''}`} />
       </button>
 
       {/* Top Section: Image and Info */}
       <div className="flex flex-col">
-        {/* Product Image Container: Compact and centered */}
-        <div className="w-full h-20 sm:h-24 rounded-xl bg-slate-50/70 flex items-center justify-center p-1.5 mb-2 overflow-hidden group-hover:scale-104 transition-transform duration-200">
+        {/* Product Image Container: Clickable to preview large image */}
+        <div
+          onClick={handleImageClick}
+          className="relative group/image w-full h-20 sm:h-24 rounded-xl bg-slate-50/70 flex items-center justify-center p-1.5 mb-2 overflow-hidden cursor-pointer hover:bg-emerald-50/40 transition-colors"
+          title="Click to view product image"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleImageClick(e as any);
+            }
+          }}
+        >
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-contain mix-blend-multiply"
+            className="w-full h-full object-contain mix-blend-multiply group-hover/image:scale-108 transition-transform duration-200"
             loading="lazy"
           />
+
+          {/* Subtle View Indicator Overlay on Hover */}
+          <div className="absolute inset-0 bg-slate-900/15 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
+            <span className="p-1 rounded-full bg-white/95 text-slate-800 shadow-sm flex items-center gap-1 text-[10px] font-bold px-1.5">
+              <Eye className="w-3 h-3 text-[#15803d]" />
+              <span>View</span>
+            </span>
+          </div>
         </div>
 
         {/* Product Name, Quantity & Price in a Single Row */}
@@ -92,34 +137,45 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         </div>
       </div>
 
-      {/* Add to Cart Button: Compact & neat */}
+      {/* Buy Now Button: Guaranteed single-row on all screens */}
       <button
         type="button"
-        onClick={handleAdd}
+        onClick={handleBuyNow}
         disabled={isOutOfStock}
-        className={`w-full mt-2 py-1.5 px-2 rounded-xl text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1 transition-all duration-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-1 ${
+        className={`w-full mt-2 py-1.5 px-1.5 sm:px-2 rounded-xl text-[10px] sm:text-xs font-bold whitespace-nowrap shrink-0 flex items-center justify-center gap-1 sm:gap-1.5 transition-all duration-200 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-1 ${
           isOutOfStock
             ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
             : isAdded
             ? 'bg-emerald-700 text-white cursor-pointer'
-            : 'bg-[#135d38] hover:bg-[#0f4e2e] text-white active:scale-98 cursor-pointer'
+            : 'bg-[#15803d] hover:bg-[#166534] text-white active:scale-98 cursor-pointer shadow-xs'
         }`}
       >
         {isOutOfStock ? (
-          <span>Not Available</span>
+          <span className="whitespace-nowrap shrink-0">Not Available</span>
         ) : isAdded ? (
-          <>
-            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3]" />
-            <span>Added</span>
-          </>
+          <span className="whitespace-nowrap shrink-0 inline-flex items-center justify-center gap-1">
+            <Check className="w-3 h-3 sm:w-3.5 sm:h-3.5 stroke-[3] shrink-0" />
+            <span>Proceeding...</span>
+          </span>
         ) : (
-          <>
-            <ShoppingCart className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-            <span>Add</span>
-          </>
+          <span className="whitespace-nowrap shrink-0 inline-flex items-center justify-center gap-1">
+            <ShoppingBag className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+            <span className="whitespace-nowrap">Buy Now</span>
+          </span>
         )}
       </button>
+
+      {/* Large Product Image Preview Modal */}
+      <ProductImageModal
+        product={product}
+        isOpen={isImageModalOpen}
+        onClose={() => setIsImageModalOpen(false)}
+        onBuyNow={() => handleBuyNow()}
+        isFavorite={isFavorite}
+        onToggleFavorite={toggleFavorite}
+      />
 
     </div>
   );
 };
+

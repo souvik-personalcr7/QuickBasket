@@ -53,6 +53,8 @@ export function isCustomerOnlyRoute(pathname: string): boolean {
   return (
     pathname === '/cart' ||
     pathname.startsWith('/cart/') ||
+    pathname === '/buy-now' ||
+    pathname.startsWith('/buy-now/') ||
     pathname === '/checkout' ||
     pathname.startsWith('/checkout/') ||
     pathname === '/orders' ||
@@ -185,7 +187,7 @@ export function evaluateRouteAccess(
 
   // --- SHOP OWNER ---
   if (role === 'shop_owner') {
-    if (isCustomerOnlyRoute(normPath) || normPath === '/') {
+    if (isCustomerOnlyRoute(normPath) || normPath === '/' || normPath === '/favorites' || normPath.startsWith('/favorites/')) {
       return {
         action: 'redirect',
         targetUrl: '/shop',
@@ -211,7 +213,7 @@ export function evaluateRouteAccess(
 
   // --- DELIVERY PARTNER ---
   if (role === 'delivery_partner') {
-    if (isCustomerOnlyRoute(normPath) || normPath === '/') {
+    if (isCustomerOnlyRoute(normPath) || normPath === '/' || normPath === '/favorites' || normPath.startsWith('/favorites/')) {
       return {
         action: 'redirect',
         targetUrl: '/delivery',
