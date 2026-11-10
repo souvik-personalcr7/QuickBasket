@@ -76,7 +76,9 @@ export function isAuthPageRoute(pathname: string): boolean {
     pathname === '/login' ||
     pathname.startsWith('/login/') ||
     pathname === '/signup' ||
-    pathname.startsWith('/signup/')
+    pathname.startsWith('/signup/') ||
+    pathname === '/forgot-password' ||
+    pathname.startsWith('/forgot-password/')
   );
 }
 

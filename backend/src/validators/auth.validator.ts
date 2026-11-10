@@ -58,8 +58,26 @@ export const updateProfileSchema = z.object({
   avatar: z.string().optional(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+});
+
+export const verifyOtpSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  otp: z.string().length(6, 'Verification code must be exactly 6 digits'),
+});
+
+export const resetPasswordSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  otp: z.string().length(6, 'Verification code must be exactly 6 digits'),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters long'),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type UpdateAddressInput = z.infer<typeof updateAddressSchema>;
 export type UpdateShopDetailsInput = z.infer<typeof updateShopDetailsSchema>;
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

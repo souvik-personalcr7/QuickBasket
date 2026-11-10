@@ -113,6 +113,17 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
   const [liveRiderLocation, setLiveRiderLocation] = useState<RiderLocation | null>(null);
   const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
   const [liveDistanceKm, setLiveDistanceKm] = useState<number | null>(null);
+
+  // Safeguard: Lock background body scroll when opened as a modal
+  useEffect(() => {
+    if (isModal) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isModal]);
   const [liveEtaMinutes, setLiveEtaMinutes] = useState<number | null>(null);
   const [lastUpdatedSecAgo, setLastUpdatedSecAgo] = useState<number>(0);
 
@@ -471,6 +482,12 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                 ? 'Out for Delivery — Your Groceries are On the Way!'
                 : 'Store is Preparing Your Order'}
             </h2>
+            {isDelivered && (
+              <p className="text-xs sm:text-sm font-bold text-emerald-700 mt-1 flex items-center gap-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Devlivery successfull ..</span>
+              </p>
+            )}
           </div>
         </div>
 
@@ -497,6 +514,28 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
 
       {/* Main Tracking Content */}
       <div className="overflow-y-auto p-6 space-y-6">
+        {/* Delivery Completed Celebration Banner */}
+        {isDelivered && (
+          <div className="bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 rounded-2xl p-4 text-white shadow-md flex items-center justify-between gap-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <span className="text-[11px] font-semibold text-emerald-100 uppercase tracking-wider block">
+                  Delivery Status
+                </span>
+                <span className="text-base sm:text-lg font-black tracking-tight">
+                  Devlivery successfull ..
+                </span>
+              </div>
+            </div>
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/20 border border-white/30 text-white shrink-0">
+              Delivered
+            </span>
+          </div>
+        )}
+
         {/* Dynamic Metric Bar during In-Flight Transit */}
         {isOutForDelivery && !isDelivered && (
           <div className="bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 rounded-2xl p-4 text-white shadow-md flex flex-wrap items-center justify-between gap-4">

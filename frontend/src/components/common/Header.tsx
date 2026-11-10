@@ -39,6 +39,17 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
     }
   }, [mobileMenuOpen]);
 
+  // Auto-close left drawer if resized to desktop view
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -115,8 +126,8 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
             
-            {/* Hamburger Menu Toggle (Opens Left Side Drawer) */}
-            <div className="flex items-center">
+            {/* Hamburger Menu Toggle (Mobile view only; hidden in Desktop view) */}
+            <div className="flex md:hidden items-center">
               <button
                 type="button"
                 onClick={(e) => {
@@ -354,21 +365,34 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
 
                         {/* Customer Favorites Link in Dropdown */}
                         {user.role === 'customer' && (
-                          <Link
-                            href="/favorites"
-                            onClick={() => setUserDropdownOpen(false)}
-                            className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition-colors"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Heart className="w-4 h-4 text-rose-500 fill-rose-500/30" />
-                              <span>My Favorites</span>
-                            </div>
-                            {favoritesCount > 0 && (
+                          favoritesCount > 0 ? (
+                            <Link
+                              href="/favorites"
+                              onClick={() => setUserDropdownOpen(false)}
+                              className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
+                                <span>My Favorites</span>
+                              </div>
                               <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">
                                 {favoritesCount}
                               </span>
-                            )}
-                          </Link>
+                            </Link>
+                          ) : (
+                            <div
+                              className="flex items-center justify-between px-4 py-2.5 text-xs font-medium text-slate-400 bg-slate-50/40 cursor-not-allowed select-none"
+                              title="No favorites saved"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <Heart className="w-4 h-4 text-slate-300" />
+                                <span>My Favorites</span>
+                              </div>
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-400">
+                                0
+                              </span>
+                            </div>
+                          )
                         )}
 
                         <Link
@@ -432,10 +456,10 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         </div>
       </header>
 
-      {/* Slide-Out Left Drawer (Accessible on Mobile & Desktop) */}
+      {/* Slide-Out Left Drawer (Accessible on Mobile only; hidden in Desktop view) */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity md:hidden"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setMobileMenuOpen(false);
@@ -443,7 +467,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
           }}
         >
           <div
-            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200"
+            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200 md:hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div>
@@ -523,36 +547,41 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
               ) : (
                 <nav className="mt-4 space-y-2">
                   {/* Left Side Drawer Dedicated Option: Favorite */}
-                  <Link
-                    href="/favorites"
-                    onClick={() => {
-                      setActiveNav('Favorite');
-                      setMobileMenuOpen(false);
-                    }}
-                    className={`flex items-center justify-between px-3.5 py-2.5 text-base font-semibold rounded-xl transition-all cursor-pointer ${
-                      pathname === '/favorites'
-                        ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200 shadow-2xs'
-                        : 'text-slate-700 hover:bg-rose-50/70 hover:text-rose-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Heart
-                        className={`w-5 h-5 transition-transform ${
-                          favoritesCount > 0 ? 'text-rose-500 fill-rose-500' : 'text-slate-400'
-                        }`}
-                      />
-                      <span>Favorite</span>
-                    </div>
-                    {favoritesCount > 0 ? (
+                  {favoritesCount > 0 ? (
+                    <Link
+                      href="/favorites"
+                      onClick={() => {
+                        setActiveNav('Favorite');
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-3.5 py-2.5 text-base font-semibold rounded-xl transition-all cursor-pointer ${
+                        pathname === '/favorites'
+                          ? 'bg-rose-50 text-rose-700 font-bold border border-rose-200 shadow-2xs'
+                          : 'text-slate-700 hover:bg-rose-50/70 hover:text-rose-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Heart className="w-5 h-5 text-rose-500 fill-rose-500 transition-transform" />
+                        <span>Favorite</span>
+                      </div>
                       <span className="px-2.5 py-0.5 text-xs font-bold bg-rose-500 text-white rounded-full shadow-2xs">
                         {favoritesCount}
                       </span>
-                    ) : (
-                      <span className="text-xs text-slate-400 font-normal">
-                        0
+                    </Link>
+                  ) : (
+                    <div
+                      className="flex items-center justify-between px-3.5 py-2.5 text-base font-medium rounded-xl text-slate-400 bg-slate-50/70 cursor-not-allowed select-none border border-slate-100/80"
+                      title="Favorite is disabled because no items are saved. Tap the heart icon on any product to save favorites."
+                    >
+                      <div className="flex items-center gap-3">
+                        <Heart className="w-5 h-5 text-slate-300" />
+                        <span>Favorite</span>
+                      </div>
+                      <span className="px-2 py-0.5 text-[11px] font-semibold bg-slate-200/80 text-slate-500 rounded-full">
+                        Disabled (0)
                       </span>
-                    )}
-                  </Link>
+                    </div>
+                  )}
 
                   {navLinks.map((link) => {
                       if (link.name === 'Track Order') {

@@ -176,9 +176,12 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
   });
 
   describe('5. Unauthenticated User Access', () => {
-    test('Allows public browsing of homepage and favorites', () => {
+    test('Allows public browsing of homepage, favorites and auth pages', () => {
       assert.equal(evaluateRouteAccess('/', null).action, 'allow');
       assert.equal(evaluateRouteAccess('/favorites', null).action, 'allow');
+      assert.equal(evaluateRouteAccess('/login', null).action, 'allow');
+      assert.equal(evaluateRouteAccess('/signup', null).action, 'allow');
+      assert.equal(evaluateRouteAccess('/forgot-password', null).action, 'allow');
     });
 
     test('Redirects unauthenticated users from protected routes to login with redirect param', () => {
@@ -228,20 +231,23 @@ describe('Frontend Strict RBAC Route Protection Matrix', () => {
     });
   });
 
-  describe('7. Auth Pages (/login, /signup) for Authenticated Users', () => {
+  describe('7. Auth Pages (/login, /signup, /forgot-password) for Authenticated Users', () => {
     test('Redirects logged in customer to /', () => {
       assert.equal(evaluateRouteAccess('/login', customerSession).targetUrl, '/');
       assert.equal(evaluateRouteAccess('/signup', customerSession).targetUrl, '/');
+      assert.equal(evaluateRouteAccess('/forgot-password', customerSession).targetUrl, '/');
     });
 
     test('Redirects logged in shop owner to /shop', () => {
       assert.equal(evaluateRouteAccess('/login', shopOwnerSession).targetUrl, '/shop');
       assert.equal(evaluateRouteAccess('/signup', shopOwnerSession).targetUrl, '/shop');
+      assert.equal(evaluateRouteAccess('/forgot-password', shopOwnerSession).targetUrl, '/shop');
     });
 
     test('Redirects logged in delivery partner to /delivery', () => {
       assert.equal(evaluateRouteAccess('/login', deliverySession).targetUrl, '/delivery');
       assert.equal(evaluateRouteAccess('/signup', deliverySession).targetUrl, '/delivery');
+      assert.equal(evaluateRouteAccess('/forgot-password', deliverySession).targetUrl, '/delivery');
     });
   });
 });

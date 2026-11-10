@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { connectDB } from './config/db';
 import { initSocketService } from './services/socket.service';
+import { verifyEmailConnection } from './services/email.service';
 
 const app = createApp();
 const server = http.createServer(app);
@@ -32,10 +33,15 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 });
 
 const startServer = async () => {
-  server.listen(env.PORT);
+  server.listen(env.PORT, () => {
+    console.log(`Server connected successfully on port ${env.PORT}`);
+  });
 
   // Connect to MongoDB
   await connectDB();
+
+  // Verify email service connection
+  await verifyEmailConnection();
 };
 
 // Handle unhandled rejections

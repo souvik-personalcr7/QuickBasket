@@ -1,7 +1,6 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { v1Router } from './routes';
@@ -39,11 +38,6 @@ export const createApp = (): Application => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(cookieParser());
-
-  // Request Logging
-  if (env.NODE_ENV !== 'test') {
-    app.use(morgan(env.NODE_ENV === 'development' ? 'dev' : 'combined'));
-  }
 
   // Base API Info
   app.get('/', (req, res) => {

@@ -71,10 +71,124 @@ export interface LiveBackendOrder {
   routeDistanceKm?: number;
 }
 
+// Synchronous helper to read persisted duty status immediately on initial page mount/refresh
+const getInitialDutyStatus = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  try {
+    // 1. Check general rider duty key
+    const gen = localStorage.getItem('qb_rider_online_duty');
+    if (gen !== null) {
+      return gen === 'true';
+    }
+    // 2. Fallback to scanning any rider-specific keys in storage
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('qb_rider_online_duty_')) {
+        const val = localStorage.getItem(k);
+        if (val !== null) return val === 'true';
+      }
+    }
+    return true;
+  } catch {
+    return true;
+  }
+};
+
 export default function DeliveryPartnerDashboard() {
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const [isOnDuty, setIsOnDuty] = useState(true);
+
+  // Initialize with synchronous storage read so on refresh it IMMEDIATELY shows offline if turned off
+  const [isOnDuty, setIsOnDutyState] = useState<boolean>(getInitialDutyStatus);
+
+  // Load persistent duty status when user profile becomes available
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+      if (riderId) {
+        const specific = localStorage.getItem(`qb_rider_online_duty_${riderId}`);
+        if (specific !== null) {
+          setIsOnDutyState(specific === 'true');
+          return;
+        }
+      }
+      const gen = localStorage.getItem('qb_rider_online_duty');
+      if (gen !== null) {
+        setIsOnDutyState(gen === 'true');
+      }
+    } catch {
+      // Ignored
+    }
+  }, [user]);
+
+  // Persistent toggle: saves state so it remains OFF through reloads until rider turns it back ON
+  const setIsOnDuty = useCallback(
+    (newDuty: boolean | ((prev: boolean) => boolean)) => {
+      setIsOnDutyState((prev) => {
+        const next = typeof newDuty === 'function' ? newDuty(prev) : newDuty;
+        if (typeof window !== 'undefined') {
+          try {
+            // Save to both universal key and user-scoped key
+            localStorage.setItem('qb_rider_online_duty', String(next));
+            const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+            if (riderId) {
+              localStorage.setItem(`qb_rider_online_duty_${riderId}`, String(next));
+            }
+          } catch (e) {
+            console.warn('Failed to save rider duty status to localStorage', e);
+          }
+        }
+        return next;
+      });
+
+      // Dispatch event outside state updater
+      if (typeof window !== 'undefined') {
+        queueMicrotask(() => {
+          window.dispatchEvent(new Event('qb:rider_duty_updated'));
+        });
+      }
+    },
+    [user]
+  );
+
+  // Synchronize cross-tab and storage events
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleStorage = (e: StorageEvent) => {
+      if ((e.key === 'qb_rider_online_duty' || e.key?.startsWith('qb_rider_online_duty_')) && e.newValue !== null) {
+        setIsOnDutyState(e.newValue === 'true');
+      }
+    };
+
+    const handleCustom = () => {
+      try {
+        const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+        if (riderId) {
+          const specific = localStorage.getItem(`qb_rider_online_duty_${riderId}`);
+          if (specific !== null) {
+            setIsOnDutyState(specific === 'true');
+            return;
+          }
+        }
+        const gen = localStorage.getItem('qb_rider_online_duty');
+        if (gen !== null) {
+          setIsOnDutyState(gen === 'true');
+        }
+      } catch {
+        // Ignored
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('qb:rider_duty_updated', handleCustom);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('qb:rider_duty_updated', handleCustom);
+    };
+  }, [user]);
+
   const [activeTab, setActiveTab] = useState<'dispatches' | 'history'>('dispatches');
 
   // Client-side RBAC guard
@@ -363,9 +477,9 @@ export default function DeliveryPartnerDashboard() {
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold mb-3 border border-blue-400/20">
-              <Bike className="w-3.5 h-3.5 text-blue-400" />
-              <span>Hyperlocal Rider Dispatch Center</span>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold mb-3 border border-blue-400/20 whitespace-nowrap shrink-0">
+              <Bike className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span className="whitespace-nowrap">Hyperlocal Rider Dispatch Center</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Hello, {riderName}!
@@ -377,14 +491,14 @@ export default function DeliveryPartnerDashboard() {
                 {vehicleNumber ? ` (${vehicleNumber})` : ''}
               </span>
             </p>
-            <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-slate-300">
-              <div className="flex items-center gap-1.5 text-emerald-300">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Verified Rider Partner</span>
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-4 text-xs text-slate-300">
+              <div className="inline-flex items-center gap-1.5 text-emerald-300 whitespace-nowrap shrink-0">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="whitespace-nowrap">Verified Rider Partner</span>
               </div>
-              <div className="flex items-center gap-1.5 text-blue-300">
-                <Bike className="w-4 h-4 text-blue-400" />
-                <span>QuickBasket Hyperlocal Fleet</span>
+              <div className="inline-flex items-center gap-1.5 text-blue-300 whitespace-nowrap shrink-0">
+                <Bike className="w-4 h-4 text-blue-400 shrink-0" />
+                <span className="whitespace-nowrap">QuickBasket Hyperlocal Fleet</span>
               </div>
             </div>
           </div>
@@ -508,7 +622,7 @@ export default function DeliveryPartnerDashboard() {
 
         <div className="qb-card p-5">
           <div className="flex items-center justify-between text-slate-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Completed Trips</span>
+            <span className="text-xs font-bold uppercase tracking-wider whitespace-nowrap shrink-0">Completed Trips</span>
             <div className="p-2 rounded-xl bg-purple-50 text-purple-700">
               <PackageCheck className="w-4 h-4" />
             </div>
@@ -535,40 +649,54 @@ export default function DeliveryPartnerDashboard() {
 
       {/* Tabs & Content */}
       <div className="space-y-6">
-        <div className="flex items-center gap-3 pb-2 border-b border-slate-200">
-          <button
-            type="button"
-            onClick={() => setActiveTab('dispatches')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'dispatches'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Navigation className="w-4 h-4" />
-            <span>Active Dispatch Board</span>
-            {activeOrder && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-700 text-white">
-                1 Active
+        {/* Segmented Tab Card Container */}
+        <div className="qb-card p-1 sm:p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl shadow-2xs max-w-xl">
+          <div className="grid grid-cols-2 gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('dispatches')}
+              className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                activeTab === 'dispatches'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/60'
+              }`}
+            >
+              <Navigation className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="whitespace-nowrap">
+                <span className="hidden sm:inline">Active Dispatch Board</span>
+                <span className="sm:hidden">Active Dispatch</span>
               </span>
-            )}
-          </button>
+              {activeOrder && (
+                <span className="text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full bg-emerald-700 text-white shrink-0 whitespace-nowrap font-extrabold">
+                  <span className="sm:hidden">1</span>
+                  <span className="hidden sm:inline">1 Active</span>
+                </span>
+              )}
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('history')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'history'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <PackageCheck className="w-4 h-4" />
-            <span>Completed Trips History</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 text-slate-700">
-              {completedTrips.length}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`w-full py-1.5 sm:py-2 px-2 sm:px-3 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap inline-flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-white/80 text-slate-700 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200/60'
+              }`}
+            >
+              <PackageCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              <span className="whitespace-nowrap">
+                <span className="hidden sm:inline">Completed Trips History</span>
+                <span className="sm:hidden">Completed Trips</span>
+              </span>
+              <span
+                className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap font-extrabold ${
+                  activeTab === 'history' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
+                }`}
+              >
+                {completedTrips.length}
+              </span>
+            </button>
+          </div>
         </div>
 
         {activeTab === 'dispatches' && (
@@ -687,34 +815,34 @@ export default function DeliveryPartnerDashboard() {
                 </div>
 
                 {/* Status Action Buttons */}
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-3 border-t border-slate-100 overflow-x-auto scrollbar-none">
                   {activeOrder.status === 'RIDER_ACCEPTED' ? (
                     <button
                       type="button"
                       disabled={actionLoadingId === activeOrder._id}
                       onClick={() => handleUpdateStatus(activeOrder._id, 'OUT_FOR_DELIVERY')}
-                      className="inline-flex items-center gap-2 py-2.5 px-6 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 sm:px-6 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
                     >
                       {actionLoadingId === activeOrder._id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                       ) : (
-                        <Check className="w-4 h-4" />
+                        <Check className="w-4 h-4 shrink-0" />
                       )}
-                      <span>Confirm Picked Up &amp; Start Doorstep Delivery (Out for Delivery)</span>
+                      <span className="whitespace-nowrap">Confirm Picked Up &amp; Start Doorstep Delivery (Out for Delivery)</span>
                     </button>
                   ) : (
                     <button
                       type="button"
                       disabled={actionLoadingId === activeOrder._id}
                       onClick={() => handleUpdateStatus(activeOrder._id, 'DELIVERED')}
-                      className="inline-flex items-center gap-2 py-2.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 sm:px-6 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
                     >
                       {actionLoadingId === activeOrder._id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                       ) : (
-                        <CheckCircle2 className="w-4 h-4" />
+                        <CheckCircle2 className="w-4 h-4 shrink-0" />
                       )}
-                      <span>Mark as Delivered &amp; Collect Payout (₹{activeOrder.deliveryFee || 35})</span>
+                      <span className="whitespace-nowrap">Mark as Delivered &amp; Collect Payout (₹{activeOrder.deliveryFee || 35})</span>
                     </button>
                   )}
                 </div>
@@ -767,14 +895,14 @@ export default function DeliveryPartnerDashboard() {
                         type="button"
                         disabled={actionLoadingId === ord._id}
                         onClick={() => handleAcceptOrder(ord._id)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
                       >
                         {actionLoadingId === ord._id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                         ) : (
-                          <Bike className="w-4 h-4" />
+                          <Bike className="w-4 h-4 shrink-0" />
                         )}
-                        <span>Accept Delivery Request & Start GPS</span>
+                        <span className="whitespace-nowrap">Accept Delivery Request & Start GPS</span>
                       </button>
                     </div>
                   ))}

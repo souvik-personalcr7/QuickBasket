@@ -36,6 +36,8 @@ export interface IUser extends Document {
   address?: IUserAddress;
   shopDetails?: IShopDetails;
   deliveryDetails?: IDeliveryDetails;
+  resetPasswordOtp?: string;
+  resetPasswordOtpExpires?: Date;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -108,6 +110,16 @@ const UserSchema = new Schema<IUser>(
       type: Boolean,
       default: true,
     },
+    resetPasswordOtp: {
+      type: String,
+      default: undefined,
+      select: false,
+    },
+    resetPasswordOtpExpires: {
+      type: Date,
+      default: undefined,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -117,6 +129,8 @@ const UserSchema = new Schema<IUser>(
         delete ret._id;
         delete ret.__v;
         delete ret.password;
+        delete ret.resetPasswordOtp;
+        delete ret.resetPasswordOtpExpires;
         return ret;
       },
     },

@@ -2,10 +2,20 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { User, IUser } from '../models/User';
-import { registerSchema, loginSchema, updateAddressSchema, updateShopDetailsSchema, updateProfileSchema } from '../validators/auth.validator';
+import {
+  registerSchema,
+  loginSchema,
+  updateAddressSchema,
+  updateShopDetailsSchema,
+  updateProfileSchema,
+  forgotPasswordSchema,
+  verifyOtpSchema,
+  resetPasswordSchema,
+} from '../validators/auth.validator';
 import { AppError } from '../utils/appError';
 import { sendResponse } from '../utils/apiResponse';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
+import { sendPasswordResetOtpEmail } from '../services/email.service';
 
 // Helper to sign JWT
 export const signToken = (user: IUser): string => {
@@ -324,6 +334,129 @@ export const updateProfile = async (
       message: 'Profile details updated successfully',
       data: {
         user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues.map((i) => i.message).join(', ');
+      throw new AppError(errorMsg, 400);
+    }
+
+    const { email } = parsed.data;
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      throw new AppError('No account found with this email address.', 404);
+    }
+
+    // Generate secure 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    user.resetPasswordOtp = otp;
+    user.resetPasswordOtpExpires = otpExpires;
+    await user.save({ validateModifiedOnly: true });
+
+    // Send email via email service
+    await sendPasswordResetOtpEmail({
+      to: user.email,
+      name: user.name,
+      otp,
+    });
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: 'A 6-digit verification code has been dispatched to your email address.',
+      data: {
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const verifyOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const parsed = verifyOtpSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues.map((i) => i.message).join(', ');
+      throw new AppError(errorMsg, 400);
+    }
+
+    const { email, otp } = parsed.data;
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+resetPasswordOtp +resetPasswordOtpExpires');
+
+    if (!user) {
+      throw new AppError('No account found with this email address.', 404);
+    }
+
+    if (
+      !user.resetPasswordOtp ||
+      user.resetPasswordOtp !== otp.trim() ||
+      !user.resetPasswordOtpExpires ||
+      user.resetPasswordOtpExpires.getTime() < Date.now()
+    ) {
+      throw new AppError('Invalid or expired verification code. Please request a new code.', 400);
+    }
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: 'Verification code verified successfully. Please enter your new password.',
+      data: {
+        verified: true,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const errorMsg = parsed.error.issues.map((i) => i.message).join(', ');
+      throw new AppError(errorMsg, 400);
+    }
+
+    const { email, otp, newPassword } = parsed.data;
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+password +resetPasswordOtp +resetPasswordOtpExpires');
+
+    if (!user) {
+      throw new AppError('No account found with this email address.', 404);
+    }
+
+    if (
+      !user.resetPasswordOtp ||
+      user.resetPasswordOtp !== otp.trim() ||
+      !user.resetPasswordOtpExpires ||
+      user.resetPasswordOtpExpires.getTime() < Date.now()
+    ) {
+      throw new AppError('Invalid or expired verification code. Please request a new code.', 400);
+    }
+
+    // Set new password (pre-save hook will hash it with bcrypt salt)
+    user.password = newPassword;
+    user.resetPasswordOtp = undefined;
+    user.resetPasswordOtpExpires = undefined;
+
+    await user.save();
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: 'Password has been reset successfully. You can now log in with your new password.',
+      data: {
+        success: true,
       },
     });
   } catch (error) {

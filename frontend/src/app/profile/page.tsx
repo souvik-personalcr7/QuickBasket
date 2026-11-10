@@ -473,25 +473,25 @@ export default function ProfilePage() {
 
       {/* Role Shortcut if Merchant or Rider */}
       {isMerchantOrRider && (
-        <div className="p-5 rounded-3xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <div className="p-3.5 sm:p-5 rounded-3xl bg-emerald-50/80 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             {role === 'shop_owner' ? (
-              <Store className="w-6 h-6 text-emerald-700" />
+              <Store className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700 shrink-0" />
             ) : (
-              <Bike className="w-6 h-6 text-emerald-700" />
+              <Bike className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-700 shrink-0" />
             )}
-            <div>
-              <h2 className="text-sm font-extrabold text-slate-900">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-xs sm:text-sm md:text-base font-extrabold text-slate-900 whitespace-nowrap overflow-x-auto scrollbar-none">
                 Switch to {role === 'shop_owner' ? 'Shop Owner' : 'Delivery Partner'} Workspace
               </h2>
-              <p className="text-xs text-slate-600">
+              <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 truncate sm:whitespace-normal">
                 Manage your store catalog, incoming orders, and live dispatch duties.
               </p>
             </div>
           </div>
           <Link
             href={getRoleRedirectPath(role)}
-            className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center gap-1.5 shrink-0 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shrink-0 transition-colors shadow-2xs whitespace-nowrap"
           >
             <span>Open Dashboard</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -503,9 +503,9 @@ export default function ProfilePage() {
       {role === 'shop_owner' && user.shopDetails && (
         <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
           <div className="flex items-center justify-between gap-3 pb-3 border-b border-emerald-100">
-            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Store className="w-4 h-4 text-emerald-600" />
-              <span>Registered Storefront Details</span>
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2 whitespace-nowrap min-w-0">
+              <Store className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="whitespace-nowrap">Registered Storefront Details</span>
             </h2>
             <div className="flex items-center gap-2">
               {!isEditingShop ? (
@@ -761,17 +761,18 @@ export default function ProfilePage() {
 
       {/* Delivery Partner Registered Details */}
       {role === 'delivery_partner' && user.deliveryDetails && (
-        <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-3">
-          <div className="flex items-center justify-between pb-3 border-b border-emerald-100">
-            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <Bike className="w-4 h-4 text-emerald-600" />
-              <span>Registered Rider & Fleet Details</span>
+        <div className="bg-white rounded-3xl border border-emerald-200/80 p-4 sm:p-6 shadow-xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3 border-b border-emerald-100">
+            <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2 whitespace-nowrap min-w-0">
+              <Bike className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span className="whitespace-nowrap">Registered Rider & Fleet Details</span>
             </h2>
             <Link
               href="/delivery"
-              className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors shrink-0 whitespace-nowrap self-start sm:self-auto"
             >
-              Open Dispatch Dashboard &rarr;
+              <span>Open Dispatch Dashboard</span>
+              <span>&rarr;</span>
             </Link>
           </div>
 
@@ -975,7 +976,7 @@ export default function ProfilePage() {
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
                 <Navigation className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{isShopOwner ? 'Shop locations' : 'Delivery Address'}</span>
+                <span>{isShopOwner ? 'Shop locations' : 'Delivery Boy Address'}</span>
               </span>
               <Link
                 href="/addresses"

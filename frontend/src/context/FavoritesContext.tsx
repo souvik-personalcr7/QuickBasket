@@ -1,25 +1,32 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Product } from '@/data/mockData';
 import { useAuth } from './AuthContext';
 
 interface FavoritesContextType {
   favorites: Product[];
   favoritesCount: number;
-  isFavorite: (productId: string) => boolean;
+  isFavorite: (productId: string | number) => boolean;
   toggleFavorite: (product: Product) => void;
   addFavorite: (product: Product) => void;
-  removeFavorite: (productId: string) => void;
+  removeFavorite: (productId: string | number) => void;
   clearFavorites: () => void;
 }
 
 const FavoritesContext = createContext<FavoritesContextType | undefined>(undefined);
 
+const normalizeId = (id: any): string => {
+  if (id === null || id === undefined) return '';
+  return String(id).trim();
+};
+
 export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<Product[]>([]);
   const [mounted, setMounted] = useState(false);
+  const isInternalDispatchRef = useRef(false);
+  const hasMigratedGuestRef = useRef(false);
 
   // Compute storage key based on current authenticated customer or guest
   const getStorageKey = useCallback(() => {
@@ -35,8 +42,13 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const activeKey = getStorageKey();
       let saved = localStorage.getItem(activeKey);
 
-      // If user just logged in and user's list is empty, merge guest favorites if any
-      if ((!saved || saved === '[]') && activeKey !== 'qb_customer_favorites_guest') {
+      // One-time migration: Only if this user key has NEVER been created (null) and guest favorites exist
+      if (
+        saved === null &&
+        activeKey !== 'qb_customer_favorites_guest' &&
+        !hasMigratedGuestRef.current
+      ) {
+        hasMigratedGuestRef.current = true;
         const guestSaved = localStorage.getItem('qb_customer_favorites_guest');
         if (guestSaved && guestSaved !== '[]') {
           saved = guestSaved;
@@ -65,7 +77,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     loadFavorites();
   }, [loadFavorites]);
 
-  // Listen to cross-tab & custom storage events
+  // Listen to cross-tab & custom storage events without recursive self-reloads
   useEffect(() => {
     if (!mounted) return;
 
@@ -77,6 +89,9 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     const handleCustomEvent = () => {
+      if (isInternalDispatchRef.current) {
+        return;
+      }
       loadFavorites();
     };
 
@@ -89,7 +104,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
   }, [mounted, getStorageKey, loadFavorites]);
 
-  // Persist helper that supports both direct arrays and functional updaters
+  // Persist helper that writes synchronously to localStorage and updates React state
   const persistFavorites = useCallback(
     (updater: Product[] | ((prev: Product[]) => Product[])) => {
       setFavorites((prev) => {
@@ -98,52 +113,94 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           try {
             const key = getStorageKey();
             localStorage.setItem(key, JSON.stringify(next));
-            window.dispatchEvent(new Event('qb:favorites_updated'));
           } catch (e) {
             console.warn('Failed to save favorites to localStorage', e);
           }
         }
         return next;
       });
+
+      // Notify external consumers asynchronously without triggering redundant self-reload
+      if (typeof window !== 'undefined') {
+        isInternalDispatchRef.current = true;
+        try {
+          window.dispatchEvent(new Event('qb:favorites_updated'));
+        } finally {
+          setTimeout(() => {
+            isInternalDispatchRef.current = false;
+          }, 60);
+        }
+      }
     },
     [getStorageKey]
   );
 
   const isFavorite = useCallback(
-    (productId: string) => {
-      if (!productId) return false;
-      return favorites.some((item) => item.id === productId);
+    (productId: string | number) => {
+      const targetId = normalizeId(productId);
+      if (!targetId) return false;
+      return favorites.some((item) => {
+        const itemId = normalizeId(item?.id || (item as any)?._id);
+        return itemId === targetId;
+      });
     },
     [favorites]
   );
 
   const addFavorite = useCallback(
     (product: Product) => {
-      if (!product || !product.id) return;
+      if (!product) return;
+      const targetId = normalizeId(product.id || (product as any)?._id);
+      if (!targetId) return;
+
       persistFavorites((prev) => {
-        if (prev.some((p) => p.id === product.id)) return prev;
-        return [product, ...prev];
+        const exists = prev.some((p) => {
+          const itemId = normalizeId(p?.id || (p as any)?._id);
+          return itemId === targetId;
+        });
+        if (exists) return prev;
+        return [{ ...product, id: targetId }, ...prev];
       });
     },
     [persistFavorites]
   );
 
   const removeFavorite = useCallback(
-    (productId: string) => {
-      if (!productId) return;
-      persistFavorites((prev) => prev.filter((item) => item.id !== productId));
+    (productId: string | number) => {
+      const targetId = normalizeId(productId);
+      if (!targetId) return;
+      persistFavorites((prev) =>
+        prev.filter((item) => {
+          const itemId = normalizeId(item?.id || (item as any)?._id);
+          return itemId !== targetId;
+        })
+      );
     },
     [persistFavorites]
   );
 
   const toggleFavorite = useCallback(
     (product: Product) => {
-      if (!product || !product.id) return;
+      if (!product) return;
+      const targetId = normalizeId(product.id || (product as any)?._id);
+      if (!targetId) return;
+
       persistFavorites((prev) => {
-        const exists = prev.some((item) => item.id === product.id);
-        return exists
-          ? prev.filter((item) => item.id !== product.id)
-          : [product, ...prev];
+        const exists = prev.some((item) => {
+          const itemId = normalizeId(item?.id || (item as any)?._id);
+          return itemId === targetId;
+        });
+
+        if (exists) {
+          // If already favorited -> Remove it immediately
+          return prev.filter((item) => {
+            const itemId = normalizeId(item?.id || (item as any)?._id);
+            return itemId !== targetId;
+          });
+        } else {
+          // If not favorited -> Add to favorites
+          return [{ ...product, id: targetId }, ...prev];
+        }
       });
     },
     [persistFavorites]

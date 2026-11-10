@@ -294,16 +294,12 @@ function LoginForm() {
                 <label className="block text-xs font-semibold text-slate-700">
                   Password
                 </label>
-                <a
-                  href="#forgot"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Password reset link has been dispatched to your email.');
-                  }}
+                <Link
+                  href={`/forgot-password${email.trim() ? `?email=${encodeURIComponent(email.trim())}` : ''}`}
                   className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold hover:underline"
                 >
                   Forgot password?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
