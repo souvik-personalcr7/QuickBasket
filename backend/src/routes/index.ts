@@ -5,6 +5,8 @@ import { addressRoutes } from './address.routes';
 import { orderRoutes } from './order.routes';
 import { deliveryRoutes } from './delivery.routes';
 import { adminRoutes } from './admin.routes';
+import { productRoutes } from './product.routes';
+import { shopRoutes } from './shop.routes';
 
 const router = Router();
 
@@ -22,6 +24,12 @@ router.use('/orders', orderRoutes);
 
 // Mount Delivery Partner Routes
 router.use('/delivery', deliveryRoutes);
+
+// Mount Product Management Routes
+router.use('/products', productRoutes);
+
+// Mount Shop Discovery Routes
+router.use('/shops', shopRoutes);
 
 // Mount Admin Routes (Temporarily disabled for location feature testing)
 // router.use('/admin', adminRoutes);

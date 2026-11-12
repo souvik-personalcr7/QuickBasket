@@ -15,6 +15,7 @@ import { useCart } from '@/context/CartContext';
 import { useAuth } from '@/context/AuthContext';
 import { Product, Shop } from '@/data/mockData';
 import { getStoredShopImage } from '@/lib/imageUtils';
+import { apiClient } from '@/lib/api';
 
 export default function CustomerHomePage() {
   const router = useRouter();
@@ -63,155 +64,153 @@ export default function CustomerHomePage() {
     }
   }, [refreshTrigger]);
 
-  // Load real products & shops from shop owners
+  // Load real products & shops from backend database + shop owners
   useEffect(() => {
-    try {
-      // 1. Gather all products added by shop owners across all merchant store keys
-      const loadedProducts: Product[] = [];
-      const seenProductIds = new Set<string>();
+    let isCancelled = false;
 
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('qb_shop_products_')) {
-          const raw = localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) {
-              for (const item of parsed) {
-                if (item && item.id && !seenProductIds.has(item.id)) {
-                  seenProductIds.add(item.id);
-                  loadedProducts.push({
-                    id: item.id,
-                    name: item.name,
-                    category: item.category || 'General',
-                    unit: item.unit || '1 unit',
-                    price: Number(item.price) || 0,
-                    originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
-                    image: item.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
-                    rating: 4.8,
-                    stock: item.stock,
-                    shopId: item.shopId || key.replace('qb_shop_products_', 'shop_'),
-                    shopName: item.shopName,
+    async function loadData() {
+      // 1. Fetch from backend API (MongoDB)
+      let apiShops: Shop[] = [];
+      let apiProducts: Product[] = [];
+
+      try {
+        const [shopsRes, prodsRes] = await Promise.all([
+          apiClient<Shop[]>('/shops'),
+          apiClient<Product[]>('/products'),
+        ]);
+
+        if (shopsRes.success && Array.isArray(shopsRes.data)) {
+          apiShops = shopsRes.data;
+        }
+        if (prodsRes.success && Array.isArray(prodsRes.data)) {
+          apiProducts = prodsRes.data;
+        }
+      } catch (e) {
+        console.warn('Backend shops/products fetch warning:', e);
+      }
+
+      if (isCancelled) return;
+
+      // 2. Gather all products from localStorage (to merge any local offline items)
+      const loadedProducts: Product[] = [...apiProducts];
+      const seenProductIds = new Set<string>(apiProducts.map((p) => p.id));
+      const seenProductNames = new Set<string>(
+        apiProducts.map((p) => `${p.name.toLowerCase().trim()}_${(p.shopId || '').toLowerCase()}`)
+      );
+
+      if (typeof window !== 'undefined') {
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('qb_shop_products_')) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                  for (const item of parsed) {
+                    if (item && item.name) {
+                      const id = item.id || `local-${item.name}`;
+                      const nameKey = `${item.name.toLowerCase().trim()}_${(item.shopId || key.replace('qb_shop_products_', 'shop_')).toLowerCase()}`;
+                      if (!seenProductIds.has(id) && !seenProductNames.has(nameKey)) {
+                        seenProductIds.add(id);
+                        seenProductNames.add(nameKey);
+                        loadedProducts.push({
+                          id,
+                          name: item.name,
+                          category: item.category || 'General',
+                          unit: item.unit || '1 unit',
+                          price: Number(item.price) || 0,
+                          originalPrice: item.originalPrice ? Number(item.originalPrice) : undefined,
+                          image: item.image || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=400',
+                          rating: item.rating || 4.8,
+                          stock: item.stock !== undefined ? Number(item.stock) : 50,
+                          shopId: item.shopId || key.replace('qb_shop_products_', 'shop_'),
+                          shopName: item.shopName,
+                        });
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('LocalStorage products parse error:', e);
+        }
+      }
+
+      // 3. Gather all registered shops (from backend + localStorage)
+      const shopMap = new Map<string, Shop>();
+
+      // First add backend shops (from MongoDB)
+      for (const s of apiShops) {
+        if (!s || !s.id) continue;
+        const normKey = (s.name || s.id).trim().toLowerCase();
+        shopMap.set(normKey, s);
+      }
+
+      // Merge local registered shops
+      if (typeof window !== 'undefined') {
+        try {
+          const rawShops = localStorage.getItem('qb_registered_shops');
+          if (rawShops) {
+            const parsedShops = JSON.parse(rawShops);
+            if (Array.isArray(parsedShops)) {
+              for (const s of parsedShops) {
+                if (!s) continue;
+                const normKey = (s.name || s.id || '').trim().toLowerCase();
+                if (!normKey) continue;
+                if (!shopMap.has(normKey)) {
+                  shopMap.set(normKey, {
+                    id: s.id,
+                    name: s.name,
+                    category: s.category || 'Retail & Grocery',
+                    rating: s.rating || 4.8,
+                    reviewCount: s.reviewCount || 'Verified Store',
+                    deliveryTime: s.deliveryTime || '20-30 mins',
+                    isFreeDelivery: s.isFreeDelivery ?? true,
+                    image: s.image,
+                    address: s.address,
+                    ownerId: s.ownerId,
+                    ownerEmail: s.ownerEmail,
+                    isOpen: s.isOpen ?? true,
+                    productCount: s.productCount,
                   });
                 }
               }
             }
           }
-        }
-      }
-      setAllProducts(loadedProducts);
-
-      // 2. Gather all registered shops added by shop owners
-      const loadedShops: Shop[] = [];
-      const shopMap = new Map<string, any>();
-
-      // Check qb_registered_shops registry
-      const rawShops = localStorage.getItem('qb_registered_shops');
-      if (rawShops) {
-        const parsedShops = JSON.parse(rawShops);
-        if (Array.isArray(parsedShops)) {
-          for (const s of parsedShops) {
-            if (!s) continue;
-            // Group and deduplicate by normalized shop name or id
-            const normKey = (s.name || s.id || '').trim().toLowerCase();
-            if (!normKey) continue;
-
-            const existing = shopMap.get(normKey);
-            if (!existing) {
-              shopMap.set(normKey, s);
-            } else {
-              // Prefer the entry with a custom non-default image or richer data
-              const existingHasCustom = existing.image && !existing.image.includes('photo-1578916171728-46686eac8d58');
-              const currentHasCustom = s.image && !s.image.includes('photo-1578916171728-46686eac8d58');
-              if (!existingHasCustom && currentHasCustom) {
-                shopMap.set(normKey, { ...existing, ...s });
-              } else {
-                shopMap.set(normKey, { ...s, ...existing });
-              }
-            }
-          }
-
-          for (const s of Array.from(shopMap.values())) {
-            const isOwner = user && (
-              (user.id && s.ownerId && user.id === s.ownerId) ||
-              (user.email && s.ownerEmail && user.email.toLowerCase() === s.ownerEmail.toLowerCase()) ||
-              (user.shopDetails?.shopName && s.name && user.shopDetails.shopName.toLowerCase().trim() === s.name.toLowerCase().trim())
-            );
-
-            const resolvedImage =
-              (isOwner && user.shopDetails?.image?.trim()) ||
-              getStoredShopImage({
-                name: s.name,
-                image: s.image,
-                ownerEmail: s.ownerEmail,
-                ownerId: s.ownerId,
-              });
-
-            loadedShops.push({
-              id: s.id,
-              name: (isOwner && user.shopDetails?.shopName?.trim()) || s.name,
-              category: (isOwner && user.shopDetails?.category?.trim()) || s.category || 'Retail & Grocery',
-              rating: s.rating || 4.8,
-              reviewCount: s.reviewCount || 'Verified Store',
-              deliveryTime: s.deliveryTime || '20-30 mins',
-              isFreeDelivery: s.isFreeDelivery ?? true,
-              image: resolvedImage,
-              address: (isOwner && user.shopDetails?.address?.trim()) || s.address,
-              ownerId: s.ownerId,
-              ownerEmail: s.ownerEmail,
-              isOpen: s.isOpen,
-              productCount: s.productCount,
-              products: s.products,
-            });
-          }
+        } catch (e) {
+          console.warn('LocalStorage shops parse error:', e);
         }
       }
 
-      // If current active user is a shop owner, ensure their shop is registered and listed
-      if (user && user.role === 'shop_owner') {
-        const ownerShopName = user.shopDetails?.shopName?.trim() || `${user.name}'s Store`;
-        const alreadyListed = loadedShops.some(
-          (sh) =>
-            sh.name.toLowerCase().trim() === ownerShopName.toLowerCase().trim() ||
-            (user.id && sh.ownerId === user.id) ||
-            (user.email && sh.ownerEmail && sh.ownerEmail.toLowerCase() === user.email.toLowerCase())
-        );
+      // Compute dynamic product counts for each shop
+      const finalShops: Shop[] = Array.from(shopMap.values()).map((sh) => {
+        const ownerSuffix = sh.ownerId || sh.ownerEmail || sh.id.replace('shop_', '');
+        const count = loadedProducts.filter((p) => {
+          if (p.shopId && (p.shopId === sh.id || p.shopId === `shop_${ownerSuffix}`)) return true;
+          if (p.shopName && p.shopName.toLowerCase() === sh.name.toLowerCase()) return true;
+          return false;
+        }).length;
 
-        if (!alreadyListed) {
-          const ownerShopId = `shop_${user.id || user.email}`;
-          const resolvedOwnerImage =
-            user.shopDetails?.image?.trim() ||
-            getStoredShopImage({
-              name: ownerShopName,
-              image: user.shopDetails?.image,
-              ownerEmail: user.email,
-              ownerId: user.id,
-            });
+        return {
+          ...sh,
+          productCount: count > 0 ? count : (sh.productCount || 0),
+        };
+      });
 
-          loadedShops.push({
-            id: ownerShopId,
-            name: ownerShopName,
-            category: user.shopDetails?.category?.trim() || 'Retail & Grocery',
-            rating: 4.9,
-            reviewCount: 'Owner Verified',
-            deliveryTime: '15-30 mins',
-            isFreeDelivery: true,
-            image: resolvedOwnerImage,
-            address: user.shopDetails?.address?.trim() || user.address?.street?.trim(),
-            ownerId: user.id,
-            ownerEmail: user.email,
-            isOpen: true,
-            productCount: loadedProducts.length,
-          });
-        }
+      if (!isCancelled) {
+        setAllProducts(loadedProducts);
+        setAllShops(finalShops);
       }
-
-      setAllShops(loadedShops);
-    } catch (err) {
-      console.error('Error loading merchant products and shops:', err);
-      setAllProducts([]);
-      setAllShops([]);
     }
+
+    loadData();
+
+    return () => {
+      isCancelled = true;
+    };
   }, [user, refreshTrigger]);
 
   const handleAddToCart = (product: Product) => {

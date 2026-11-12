@@ -451,24 +451,80 @@ export default function ShopOwnerDashboard() {
     return `qb_shop_products_${user?.id || user?.email || 'guest'}`;
   }, [user?.id, user?.email]);
 
-  // Load products from storage on mount
+  // Load products from backend database and localStorage on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setProducts(parsed);
+    let isCancelled = false;
+
+    async function loadProducts() {
+      // 1. Initial read from localStorage for instant offline display
+      let localItems: ShopProduct[] = [];
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            localItems = parsed;
+            setProducts(parsed);
+          }
         }
-      } else {
-        setProducts([]);
+      } catch {
+        // ignore parse error
       }
-    } catch {
-      setProducts([]);
-    } finally {
-      setIsProductsLoaded(true);
+
+      // 2. Fetch from backend API if authenticated shop owner
+      if (user) {
+        try {
+          const res = await apiClient<ShopProduct[]>('/products/my-shop');
+          if (res.success && Array.isArray(res.data)) {
+            const backendProducts = res.data;
+
+            // If we have local items not yet in the backend, sync them now to MongoDB
+            const unsynced = localItems.filter(
+              (loc) =>
+                !backendProducts.some(
+                  (bp) =>
+                    bp.id === loc.id ||
+                    bp.name.trim().toLowerCase() === loc.name.trim().toLowerCase()
+                )
+            );
+
+            if (unsynced.length > 0) {
+              const syncRes = await apiClient<ShopProduct[]>('/products/bulk-sync', {
+                method: 'POST',
+                body: JSON.stringify({ products: unsynced }),
+              });
+              if (syncRes.success && Array.isArray(syncRes.data)) {
+                const combined = [...syncRes.data, ...backendProducts];
+                if (!isCancelled) {
+                  setProducts(combined);
+                  localStorage.setItem(storageKey, JSON.stringify(combined));
+                }
+                setIsProductsLoaded(true);
+                return;
+              }
+            }
+
+            if (!isCancelled) {
+              setProducts(backendProducts);
+              localStorage.setItem(storageKey, JSON.stringify(backendProducts));
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to load products from server:', err);
+        }
+      }
+
+      if (!isCancelled) {
+        setIsProductsLoaded(true);
+      }
     }
-  }, [storageKey]);
+
+    loadProducts();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [storageKey, user]);
 
   // Save products to storage on changes
   useEffect(() => {
@@ -748,7 +804,7 @@ export default function ShopOwnerDashboard() {
     stopLiveCamera();
   };
 
-  const handleCreateProduct = (e: React.FormEvent) => {
+  const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -774,8 +830,8 @@ export default function ShopOwnerDashboard() {
       PRESET_IMAGES[newProductCategory] ||
       PRESET_IMAGES['General Grocery'];
 
-    const currentShopId = `shop_${user?.id || user?.email || 'guest'}`;
-    const newProd: ShopProduct = {
+    const currentShopId = user?.id || `shop_${user?.email || 'guest'}`;
+    let createdProd: ShopProduct = {
       id: `prod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name: newProductName.trim(),
       category: newProductCategory,
@@ -789,7 +845,34 @@ export default function ShopOwnerDashboard() {
       createdAt: new Date().toISOString(),
     };
 
-    setProducts((prev) => [newProd, ...prev]);
+    // Save directly to MongoDB via backend API
+    try {
+      const res = await apiClient<ShopProduct>('/products', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: newProductName.trim(),
+          category: newProductCategory,
+          unit: newProductUnit.trim() || '1 item',
+          price: priceNum,
+          originalPrice: resolvedOrigPrice,
+          stock: resolvedStock,
+          image: finalImage,
+        }),
+      });
+
+      if (res.success && res.data) {
+        createdProd = res.data;
+      }
+    } catch (err) {
+      console.warn('Could not save product to backend API, using local fallback:', err);
+    }
+
+    setProducts((prev) => [createdProd, ...prev]);
+
+    // Dispatch update event for customer home page
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('qb_shop_details_updated'));
+    }
 
     // Reset Form
     setNewProductName('');
@@ -803,16 +886,40 @@ export default function ShopOwnerDashboard() {
     setIsModalOpen(false);
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await apiClient(`/products/${productId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.warn('Backend delete product warning:', err);
+    }
     setProducts((prev) => prev.filter((p) => p.id !== productId));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('qb_shop_details_updated'));
+    }
   };
 
-  const handleToggleStock = (productId: string) => {
+  const handleToggleStock = async (productId: string) => {
+    const target = products.find((p) => p.id === productId);
+    if (!target) return;
+    const newStock = target.stock > 0 ? 0 : 25;
+
+    try {
+      await apiClient(`/products/${productId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ stock: newStock }),
+      });
+    } catch (err) {
+      console.warn('Backend update product warning:', err);
+    }
+
     setProducts((prev) =>
       prev.map((p) =>
-        p.id === productId ? { ...p, stock: p.stock > 0 ? 0 : 25 } : p
+        p.id === productId ? { ...p, stock: newStock } : p
       )
     );
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('qb_shop_details_updated'));
+    }
   };
 
   return (
