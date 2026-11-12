@@ -4,14 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "node -e \"const fs=require('fs'); try{ if(!fs.existsSync('public')) fs.mkdirSync('public'); fs.copyFileSync('node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs', 'public/maplibre-gl-worker.mjs'); }catch(e){}\""
   },
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.56.0",
     "maplibre-gl": "^6.16.0",
+    "mongoose": "^9.12.1",
     "next": "^16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0",

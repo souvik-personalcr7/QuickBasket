@@ -857,6 +857,8 @@ export default function ShopOwnerDashboard() {
           originalPrice: resolvedOrigPrice,
           stock: resolvedStock,
           image: finalImage,
+          shopId: currentShopId,
+          shopName: shopName,
         }),
       });
 

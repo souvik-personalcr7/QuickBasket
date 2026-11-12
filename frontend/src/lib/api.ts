@@ -1,13 +1,23 @@
 export const getApiBaseUrl = (): string => {
+  // If explicitly configured in environment, check if it's safe to use
   if (process.env.NEXT_PUBLIC_API_URL) {
+    if (typeof window !== 'undefined') {
+      const isHttps = window.location.protocol === 'https:';
+      // If deployed over HTTPS (like Vercel), don't allow insecure HTTP port 5000
+      if (isHttps && process.env.NEXT_PUBLIC_API_URL.startsWith('http://')) {
+        return '/api';
+      }
+    }
     return process.env.NEXT_PUBLIC_API_URL;
   }
+
   if (typeof window !== 'undefined') {
-    // Dynamically use the same host IP (e.g. 192.168.x.x) for mobile testing over Wi-Fi
-    const hostname = window.location.hostname;
-    return `http://${hostname}:5000/api/v1`;
+    // In any browser environment (Vercel, mobile, or localhost), use relative '/api'
+    // This talks directly to the Next.js serverless API routes connected to MongoDB Atlas
+    return '/api';
   }
-  return 'http://localhost:5000/api/v1';
+
+  return 'http://localhost:3000/api';
 };
 
 export const API_BASE_URL = getApiBaseUrl();

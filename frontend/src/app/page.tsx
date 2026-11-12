@@ -137,6 +137,22 @@ export default function CustomerHomePage() {
         } catch (e) {
           console.warn('LocalStorage products parse error:', e);
         }
+
+        // Auto-sync any device-local products up to cloud MongoDB Atlas
+        const unsyncedToCloud = loadedProducts.filter(
+          (lp) =>
+            !apiProducts.some(
+              (ap) =>
+                ap.id === lp.id ||
+                ap.name.toLowerCase().trim() === lp.name.toLowerCase().trim()
+            )
+        );
+        if (unsyncedToCloud.length > 0) {
+          apiClient('/products/bulk-sync', {
+            method: 'POST',
+            body: JSON.stringify({ products: unsyncedToCloud }),
+          }).catch(() => {});
+        }
       }
 
       // 3. Gather all registered shops (from backend + localStorage)
