@@ -80,9 +80,14 @@ function SignupForm() {
   // If already authenticated, redirect
   useEffect(() => {
     if (isAuthenticated && currentRole) {
-      router.push(getRoleRedirectPath(currentRole));
+      const redirectParam = searchParams.get('redirect');
+      if (redirectParam && redirectParam.startsWith('/')) {
+        router.push(redirectParam);
+      } else {
+        router.push(getRoleRedirectPath(currentRole));
+      }
     }
-  }, [isAuthenticated, currentRole, router, getRoleRedirectPath]);
+  }, [isAuthenticated, currentRole, router, getRoleRedirectPath, searchParams]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -199,7 +204,12 @@ function SignupForm() {
             console.error("Failed to save registered shop:", e);
           }
         }
-        router.push(getRoleRedirectPath(res.role));
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam && redirectParam.startsWith('/')) {
+          router.push(redirectParam);
+        } else {
+          router.push(getRoleRedirectPath(res.role));
+        }
       } else {
         setErrorMsg(
           res.message ||
@@ -268,7 +278,7 @@ function SignupForm() {
         </div>
 
         {/* Main Card */}
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 p-6 sm:p-10 backdrop-blur-sm">
+        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-200/80 p-4 sm:p-8 md:p-10 backdrop-blur-sm">
           {/* Step 1: Role Selector Tabs */}
           <div className="mb-8">
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
@@ -308,7 +318,7 @@ function SignupForm() {
                         <span className="text-xs uppercase font-extrabold tracking-wider opacity-75">
                           {r.badge}
                         </span>
-                        <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                        <h3 className="text-base font-extrabold text-slate-900 leading-tight whitespace-nowrap">
                           {r.title}
                         </h3>
                       </div>
@@ -686,16 +696,16 @@ function SignupForm() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-3.5 px-6 rounded-2xl bg-[#0f5132] hover:bg-[#166534] active:bg-[#14532d] text-white font-bold text-sm shadow-lg shadow-emerald-900/10 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2"
+              className="w-full py-3.5 px-3 sm:px-6 rounded-2xl bg-[#0f5132] hover:bg-[#166534] active:bg-[#14532d] text-white font-bold text-xs sm:text-sm shadow-lg shadow-emerald-900/10 flex items-center justify-center gap-1.5 sm:gap-2 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-[#15803d] focus:ring-offset-2 whitespace-nowrap shrink-0"
             >
               {isSubmitting ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  <span>Creating Your Account...</span>
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/40 border-t-white rounded-full animate-spin shrink-0" />
+                  <span className="whitespace-nowrap">Creating Your Account...</span>
                 </>
               ) : (
                 <>
-                  <span>
+                  <span className="whitespace-nowrap">
                     Complete Registration as{" "}
                     {selectedRole === "shop_owner"
                       ? "Shop Owner"
@@ -703,7 +713,7 @@ function SignupForm() {
                         ? "Delivery Partner"
                         : "Customer"}
                   </span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 </>
               )}
             </button>

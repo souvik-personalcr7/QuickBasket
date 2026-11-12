@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Truck, ShieldCheck, Tag, Sparkles, X, IndianRupee, ShoppingBag, PackageSearch } from 'lucide-react';
+import { Search, Truck, ShieldCheck, HandCoins, Sparkles, X, IndianRupee, ShoppingBag, PackageSearch } from 'lucide-react';
 import { Product } from '@/data/mockData';
 
 interface HeroSectionProps {
@@ -250,38 +250,38 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             </div>
 
             {/* 3 Reassurance Badges */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-2 max-w-xl">
+            <div className="grid grid-cols-3 gap-1.5 sm:gap-3 md:gap-4 pt-2 w-full max-w-xl overflow-x-auto scrollbar-none items-center">
               
               {/* Fast Delivery */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
-                  <Truck className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 justify-self-start">
+                <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
+                  <Truck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 </div>
-                <div>
-                  <h4 className="text-xs sm:text-xs font-bold text-slate-900 leading-tight">Fast Delivery</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">Within 30-60 mins</p>
+                <div className="min-w-0 shrink-0">
+                  <h4 className="text-[11px] sm:text-xs font-bold text-slate-900 leading-tight whitespace-nowrap shrink-0">Fast Delivery</h4>
+                  <p className="text-[9px] sm:text-[11px] text-slate-500 leading-tight whitespace-nowrap">Within 30-60 mins</p>
                 </div>
               </div>
 
               {/* Fresh & Quality */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 justify-self-start sm:justify-self-center">
+                <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 </div>
-                <div>
-                  <h4 className="text-xs sm:text-xs font-bold text-slate-900 leading-tight">Fresh & Quality</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">100% Guaranteed</p>
+                <div className="min-w-0 shrink-0">
+                  <h4 className="text-[11px] sm:text-xs font-bold text-slate-900 leading-tight whitespace-nowrap shrink-0">Fresh & Quality</h4>
+                  <p className="text-[9px] sm:text-[11px] text-slate-500 leading-tight whitespace-nowrap">100% Guaranteed</p>
                 </div>
               </div>
 
-              {/* Best Prices */}
-              <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
-                  <Tag className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+              {/* Best Price */}
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink-0 justify-self-end">
+                <div className="w-5.5 h-5.5 sm:w-6.5 sm:h-6.5 rounded-full bg-emerald-100/70 text-[#15803d] flex items-center justify-center shrink-0">
+                  <HandCoins className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                 </div>
-                <div>
-                  <h4 className="text-xs sm:text-xs font-bold text-slate-900 leading-tight">Best Prices</h4>
-                  <p className="text-[10px] sm:text-[11px] text-slate-500 leading-tight">Everyday</p>
+                <div className="min-w-0 shrink-0">
+                  <h4 className="text-[11px] sm:text-xs font-bold text-slate-900 leading-tight whitespace-nowrap shrink-0">Best Price</h4>
+                  <p className="text-[9px] sm:text-[11px] text-slate-500 leading-tight whitespace-nowrap">Everyday</p>
                 </div>
               </div>
 

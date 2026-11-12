@@ -195,21 +195,21 @@ function LoginForm() {
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
               Select Your Role
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-3 gap-1 sm:gap-1.5 p-1 bg-slate-100 rounded-2xl border border-slate-200">
               <button
                 type="button"
                 onClick={() => {
                   setSelectedRole('customer');
                   if (errorMsg) setErrorMsg(null);
                 }}
-                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                   selectedRole === 'customer'
                     ? 'bg-white text-emerald-800 shadow-sm border border-emerald-200/60'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <ShoppingBag className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Customer</span>
+                <ShoppingBag className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span className="whitespace-nowrap">Customer</span>
               </button>
 
               <button
@@ -218,14 +218,14 @@ function LoginForm() {
                   setSelectedRole('shop_owner');
                   if (errorMsg) setErrorMsg(null);
                 }}
-                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                   selectedRole === 'shop_owner'
                     ? 'bg-white text-amber-800 shadow-sm border border-amber-200/60'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Store className="w-3.5 h-3.5 text-amber-600" />
-                <span>Shop Owner</span>
+                <Store className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="whitespace-nowrap">Shop Owner</span>
               </button>
 
               <button
@@ -234,14 +234,14 @@ function LoginForm() {
                   setSelectedRole('delivery_partner');
                   if (errorMsg) setErrorMsg(null);
                 }}
-                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl text-xs font-bold transition-all ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-1 sm:px-2 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 ${
                   selectedRole === 'delivery_partner'
                     ? 'bg-white text-blue-800 shadow-sm border border-blue-200/60'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                <Bike className="w-3.5 h-3.5 text-blue-600" />
-                <span>Delivery</span>
+                <Bike className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="whitespace-nowrap">Delivery</span>
               </button>
             </div>
           </div>
@@ -252,7 +252,7 @@ function LoginForm() {
               <RoleIcon className="w-5 h-5" />
             </div>
             <div className="text-xs">
-              <span className="font-bold">{currentRoleInfo.title} Mode:</span>{' '}
+              <span className="font-bold whitespace-nowrap">{currentRoleInfo.title} Mode:</span>{' '}
               <span className="opacity-90">{currentRoleInfo.description}</span>
             </div>
           </div>
@@ -350,30 +350,30 @@ function LoginForm() {
               <Zap className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               <span>Instant 1-Click Demo Logins</span>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-1 sm:gap-2">
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('customer')}
-                className="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors"
+                className="py-1.5 px-1 sm:px-2 rounded-lg text-[10px] sm:text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-colors whitespace-nowrap shrink-0 text-center cursor-pointer"
                 title="Customer: demo@quickbasket.com / password123"
               >
-                Customer
+                <span className="whitespace-nowrap">Customer</span>
               </button>
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('shop_owner')}
-                className="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors"
+                className="py-1.5 px-1 sm:px-2 rounded-lg text-[10px] sm:text-[11px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors whitespace-nowrap shrink-0 text-center cursor-pointer"
                 title="Shop Owner: owner@quickbasket.com / password123"
               >
-                Shop Owner
+                <span className="whitespace-nowrap">Shop Owner</span>
               </button>
               <button
                 type="button"
                 onClick={() => fillDemoCredentials('delivery_partner')}
-                className="py-1.5 px-2 rounded-lg text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 transition-colors"
+                className="py-1.5 px-1 sm:px-2 rounded-lg text-[10px] sm:text-[11px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 transition-colors whitespace-nowrap shrink-0 text-center cursor-pointer"
                 title="Delivery Partner: rider@quickbasket.com / password123"
               >
-                Rider Partner
+                <span className="whitespace-nowrap">Rider Partner</span>
               </button>
             </div>
           </div>

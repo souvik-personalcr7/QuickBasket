@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Product } from '@/data/mockData';
 import { useAuth } from './AuthContext';
+import { AuthRequiredModal } from '@/components/common/AuthRequiredModal';
 
 interface FavoritesContextType {
   favorites: Product[];
@@ -12,6 +13,9 @@ interface FavoritesContextType {
   addFavorite: (product: Product) => void;
   removeFavorite: (productId: string | number) => void;
   clearFavorites: () => void;
+  isAuthModalOpen: boolean;
+  openAuthModal: () => void;
+  closeAuthModal: () => void;
 }
 
 const FavoritesContext = createContext<FavoritesContextType | undefined>(undefined);
@@ -22,8 +26,9 @@ const normalizeId = (id: any): string => {
 };
 
 export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [favorites, setFavorites] = useState<Product[]>([]);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const isInternalDispatchRef = useRef(false);
   const hasMigratedGuestRef = useRef(false);
@@ -38,6 +43,13 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Load favorites from localStorage
   const loadFavorites = useCallback(() => {
     if (typeof window === 'undefined') return;
+    
+    // Guests cannot store or access account favorites
+    if (!isAuthenticated) {
+      setFavorites([]);
+      return;
+    }
+
     try {
       const activeKey = getStorageKey();
       let saved = localStorage.getItem(activeKey);
@@ -69,7 +81,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('Failed to load favorites from localStorage', e);
       setFavorites([]);
     }
-  }, [getStorageKey]);
+  }, [getStorageKey, isAuthenticated]);
 
   // Initial load and user change
   useEffect(() => {
@@ -137,6 +149,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const isFavorite = useCallback(
     (productId: string | number) => {
+      if (!isAuthenticated) return false;
       const targetId = normalizeId(productId);
       if (!targetId) return false;
       return favorites.some((item) => {
@@ -144,11 +157,15 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return itemId === targetId;
       });
     },
-    [favorites]
+    [favorites, isAuthenticated]
   );
 
   const addFavorite = useCallback(
     (product: Product) => {
+      if (!isAuthenticated) {
+        setIsAuthModalOpen(true);
+        return;
+      }
       if (!product) return;
       const targetId = normalizeId(product.id || (product as any)?._id);
       if (!targetId) return;
@@ -162,7 +179,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return [{ ...product, id: targetId }, ...prev];
       });
     },
-    [persistFavorites]
+    [isAuthenticated, persistFavorites]
   );
 
   const removeFavorite = useCallback(
@@ -181,6 +198,12 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const toggleFavorite = useCallback(
     (product: Product) => {
+      // If user is not logged in, they cannot favorite products -> pop up login/signup modal
+      if (!isAuthenticated) {
+        setIsAuthModalOpen(true);
+        return;
+      }
+
       if (!product) return;
       const targetId = normalizeId(product.id || (product as any)?._id);
       if (!targetId) return;
@@ -203,7 +226,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       });
     },
-    [persistFavorites]
+    [isAuthenticated, persistFavorites]
   );
 
   const clearFavorites = useCallback(() => {
@@ -222,9 +245,17 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         addFavorite,
         removeFavorite,
         clearFavorites,
+        isAuthModalOpen,
+        openAuthModal: () => setIsAuthModalOpen(true),
+        closeAuthModal: () => setIsAuthModalOpen(false),
       }}
     >
       {children}
+      {/* Global Auth Required Modal for Favorites */}
+      <AuthRequiredModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+      />
     </FavoritesContext.Provider>
   );
 };
@@ -240,6 +271,9 @@ export const useFavorites = () => {
       addFavorite: () => {},
       removeFavorite: () => {},
       clearFavorites: () => {},
+      isAuthModalOpen: false,
+      openAuthModal: () => {},
+      closeAuthModal: () => {},
     };
   }
   return context;

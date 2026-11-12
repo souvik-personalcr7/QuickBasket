@@ -17,14 +17,18 @@ import {
   Store,
   IndianRupee,
   Eye,
+  LogIn,
+  UserPlus,
 } from 'lucide-react';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { Product } from '@/data/mockData';
 import { ProductImageModal } from '@/components/home/ProductImageModal';
 
 export default function FavoritesPage() {
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
   const { favorites, removeFavorite, clearFavorites } = useFavorites();
   const { items: cartItems, addToCart, updateQuantity } = useCart();
   const [addedItemIds, setAddedItemIds] = useState<Record<string, boolean>>({});
@@ -175,8 +179,37 @@ export default function FavoritesPage() {
         </div>
 
         {/* Favorites Content Area */}
-        {favorites.length === 0 ? (
-          /* Empty State */
+        {!isAuthenticated ? (
+          /* Unauthenticated State */
+          <div className="bg-white rounded-3xl border border-slate-100 p-8 sm:p-16 text-center max-w-xl mx-auto shadow-sm">
+            <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center mx-auto mb-4 shadow-xs">
+              <Heart className="w-10 h-10 fill-rose-500/20" />
+            </div>
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+              Sign In to View Your Favorites
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+              Please log in to your account or create a new one to access your saved favorite products and easily reorder anytime.
+            </p>
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/login?redirect=/favorites"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold bg-[#15803d] hover:bg-[#166534] text-white shadow-sm transition-all"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Log In</span>
+              </Link>
+              <Link
+                href="/signup?redirect=/favorites"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-[#15803d] bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Create Account</span>
+              </Link>
+            </div>
+          </div>
+        ) : favorites.length === 0 ? (
+          /* Empty State for Logged In User */
           <div className="bg-white rounded-3xl border border-slate-100 p-8 sm:p-16 text-center max-w-xl mx-auto shadow-sm">
             <div className="w-20 h-20 rounded-3xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center mx-auto mb-4 shadow-xs">
               <Heart className="w-10 h-10 fill-rose-500/20" />

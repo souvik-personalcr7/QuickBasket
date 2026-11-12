@@ -115,10 +115,25 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const isAddressesActive = pathname === '/addresses' || (pathname ? pathname.startsWith('/addresses/') : false);
   const isProfileActive = pathname === '/profile' || (pathname ? pathname.startsWith('/profile/') : false);
   const isDeliveryActive = pathname === '/delivery' || (pathname ? pathname.startsWith('/delivery/') : false);
+  const isSignupPage = pathname === '/signup' || (pathname ? pathname.startsWith('/signup/') : false);
+  const isLoginPage = pathname === '/login' || (pathname ? pathname.startsWith('/login/') : false);
+  const isForgotPasswordPage = pathname === '/forgot-password' || (pathname ? pathname.startsWith('/forgot-password/') : false);
+  const isHomePage = pathname === '/';
 
   const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
   const isShopOwner = mounted && isAuthenticated && role === 'shop_owner';
   const isStaffPortal = isDeliveryPartner || isShopOwner;
+  const isUserLoggedIn = mounted && isAuthenticated;
+
+  // Left side drawer is disabled on the login page, sign up page, forgot password page, OR on the home page when the user is not logged in
+  const isDrawerDisabled = isLoginPage || isSignupPage || isForgotPasswordPage || (isHomePage && !isUserLoggedIn);
+
+  // Auto-close left side drawer when it becomes disabled
+  useEffect(() => {
+    if (isDrawerDisabled) {
+      setMobileMenuOpen(false);
+    }
+  }, [isDrawerDisabled]);
 
   return (
     <>
@@ -126,21 +141,23 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20 gap-4">
             
-            {/* Hamburger Menu Toggle (Mobile view only; hidden in Desktop view) */}
-            <div className="flex md:hidden items-center">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMobileMenuOpen((prev) => !prev);
-                }}
-                className="p-2 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl focus:outline-none cursor-pointer touch-manipulation active:scale-95 transition-all"
-                aria-label="Open side drawer"
-                title="Open menu"
-              >
-                {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
+            {/* Hamburger Menu Toggle (Mobile view only; hidden in Desktop view, hidden on Sign Up page, and hidden on Home page when user is not logged in) */}
+            {!isDrawerDisabled && (
+              <div className="flex md:hidden items-center">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileMenuOpen((prev) => !prev);
+                  }}
+                  className="p-2 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl focus:outline-none cursor-pointer touch-manipulation active:scale-95 transition-all"
+                  aria-label="Open side drawer"
+                  title="Open menu"
+                >
+                  {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                </button>
+              </div>
+            )}
 
             {/* Brand Logo & Tagline: Consistent Brand Colors */}
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -456,8 +473,8 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
         </div>
       </header>
 
-      {/* Slide-Out Left Drawer (Accessible on Mobile only; hidden in Desktop view) */}
-      {mobileMenuOpen && (
+      {/* Slide-Out Left Drawer (Accessible on Mobile only; hidden in Desktop view, hidden on Sign Up page, and hidden on Home page when user is not logged in) */}
+      {mobileMenuOpen && !isDrawerDisabled && (
         <div
           className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity md:hidden"
           onClick={(e) => {
