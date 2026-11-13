@@ -37,11 +37,16 @@ import {
   RefreshCw,
   Bike,
   Navigation,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { compressImageFile, syncShopImageToStorage, getStoredShopImage } from '@/lib/imageUtils';
 import { apiClient } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
+import { LiveOrderTracker } from '@/components/orders/LiveOrderTracker';
+import { ShopImageModal } from '@/components/home/ShopImageModal';
 
 export interface ShopProduct {
   id: string;
@@ -62,11 +67,16 @@ export interface ShopOrder {
   customer: string;
   customerPhone?: string;
   deliveryAddress?: string;
+  customerLocationCoordinates?: [number, number];
+  customerLandmark?: string;
+  customerAddressLabel?: string;
   items: string;
   total: number;
   status: string;
   createdAt: string;
   deliveryPartnerName?: string;
+  deliveryPartnerPhone?: string;
+  deliveryPartnerVehicle?: string;
 }
 
 const CATEGORY_OPTIONS = [
@@ -93,10 +103,23 @@ const PRESET_IMAGES: Record<string, string> = {
   'General Grocery': 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=300&auto=format&fit=crop&q=80',
 };
 
+const getInitialShopOpenStatus = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  try {
+    const saved = localStorage.getItem('qb_shop_is_open');
+    if (saved !== null) {
+      return saved === 'true';
+    }
+  } catch {
+    // ignore
+  }
+  return true;
+};
+
 export default function ShopOwnerDashboard() {
   const { user, isLoading, updateShopDetails, updateUserProfile } = useAuth();
   const router = useRouter();
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpenState] = useState<boolean>(getInitialShopOpenStatus);
   const [activeTab, setActiveTab] = useState<'catalog' | 'orders'>('catalog');
 
   // Client-side RBAC guard
@@ -125,6 +148,63 @@ export default function ShopOwnerDashboard() {
       return () => window.removeEventListener('popstate', checkTabFromUrl);
     }
   }, []);
+
+  // Synchronize persistent store open/closed status with user profile and cross-tab storage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const ownerId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+
+      let localChoice: boolean | null = null;
+      if (ownerId) {
+        const specific = localStorage.getItem(`qb_shop_is_open_${ownerId}`);
+        if (specific !== null) {
+          localChoice = specific === 'true';
+        }
+      }
+      if (localChoice === null) {
+        const gen = localStorage.getItem('qb_shop_is_open');
+        if (gen !== null) {
+          localChoice = gen === 'true';
+        }
+      }
+
+      // If the owner already set their store status physically, PRESERVE THAT CHOICE!
+      if (localChoice !== null) {
+        setIsOpenState(localChoice);
+        if (user && user.shopDetails?.isOpen !== localChoice) {
+          user.shopDetails = {
+            ...(user.shopDetails || {}),
+            isOpen: localChoice,
+          };
+          updateShopDetails({ isOpen: localChoice }).catch(() => {});
+        }
+        return;
+      }
+
+      // Fallback to database user profile if no local choice was ever saved
+      if (user?.shopDetails?.isOpen !== undefined) {
+        setIsOpenState(user.shopDetails.isOpen);
+        localStorage.setItem('qb_shop_is_open', String(user.shopDetails.isOpen));
+        if (ownerId) {
+          localStorage.setItem(`qb_shop_is_open_${ownerId}`, String(user.shopDetails.isOpen));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleStorage = (e: StorageEvent) => {
+      if ((e.key === 'qb_shop_is_open' || (user?.id && e.key === `qb_shop_is_open_${user.id}`)) && e.newValue !== null) {
+        setIsOpenState(e.newValue === 'true');
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [user?.id]);
 
   // Shop Owner Details Edit State
   const [isEditingOwner, setIsEditingOwner] = useState(false);
@@ -193,6 +273,33 @@ export default function ShopOwnerDashboard() {
   const [isSavingStore, setIsSavingStore] = useState(false);
   const [storeError, setStoreError] = useState<string | null>(null);
   const [storeSuccess, setStoreSuccess] = useState<string | null>(null);
+  const [isShopImageModalOpen, setIsShopImageModalOpen] = useState(false);
+
+  // Registered Storefront Carousel State & Smooth Touch Swipe for Mobile
+  const [storeSlideIndex, setStoreSlideIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > 40) {
+      // Swiped left -> next slide
+      setStoreSlideIndex((prev) => (prev < 3 ? prev + 1 : 0));
+    } else if (distance < -40) {
+      // Swiped right -> prev slide
+      setStoreSlideIndex((prev) => (prev > 0 ? prev - 1 : 3));
+    }
+  };
 
   // Hidden file input ref for top welcome banner image upload
   const bannerFileInputRef = useRef<HTMLInputElement>(null);
@@ -359,6 +466,7 @@ export default function ShopOwnerDashboard() {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [isOrdersLoading, setIsOrdersLoading] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
 
   const fetchShopOrders = useCallback(async () => {
     try {
@@ -371,6 +479,9 @@ export default function ShopOwnerDashboard() {
             customer: o.deliveryAddress?.receiverName || o.user?.name || 'Neighborhood Customer',
             customerPhone: o.deliveryAddress?.phone || o.user?.phone || '',
             deliveryAddress: `${o.deliveryAddress?.house || ''}, ${o.deliveryAddress?.street || ''}`,
+            customerLocationCoordinates: o.deliveryAddress?.location?.coordinates,
+            customerLandmark: o.deliveryAddress?.landmark || '',
+            customerAddressLabel: o.deliveryAddress?.label || 'Home',
             items: Array.isArray(o.items)
               ? o.items.map((it: any) => `${it.quantity}x ${it.name}`).join(', ')
               : 'Items',
@@ -378,6 +489,8 @@ export default function ShopOwnerDashboard() {
             status: o.status,
             createdAt: o.createdAt || new Date().toISOString(),
             deliveryPartnerName: o.deliveryPartner?.name,
+            deliveryPartnerPhone: o.deliveryPartner?.phone,
+            deliveryPartnerVehicle: o.deliveryPartner?.deliveryDetails?.vehicleNumber,
           }))
         );
       }
@@ -415,9 +528,25 @@ export default function ShopOwnerDashboard() {
       socket.on('rider:delivery:accepted', () => {
         fetchShopOrders();
       });
+
+      const handleOrderUpdate = () => {
+        fetchShopOrders();
+      };
+
+      window.addEventListener('qb_order_placed', handleOrderUpdate);
+      window.addEventListener('storage', handleOrderUpdate);
+
+      // Auto-poll orders every 6 seconds to keep live orders synchronized
+      const pollTimer = setInterval(() => {
+        fetchShopOrders();
+      }, 6000);
+
       return () => {
         socket.off('order:status:updated');
         socket.off('rider:delivery:accepted');
+        window.removeEventListener('qb_order_placed', handleOrderUpdate);
+        window.removeEventListener('storage', handleOrderUpdate);
+        clearInterval(pollTimer);
       };
     }
   }, [user?.role, fetchShopOrders]);
@@ -668,6 +797,60 @@ export default function ShopOwnerDashboard() {
     'Store address not set';
   const shopImage = user?.shopDetails?.image?.trim() || localShopImage;
   const isApproved = true;
+
+  // Toggle Store Online/Offline physically and persist to localStorage + MongoDB Atlas
+  const handleToggleStoreOpen = async () => {
+    const nextStatus = !isOpen;
+    setIsOpenState(nextStatus);
+
+    // 1. Immediately persist to localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('qb_shop_is_open', String(nextStatus));
+        if (user?.id) {
+          localStorage.setItem(`qb_shop_is_open_${user.id}`, String(nextStatus));
+        }
+      } catch (e) {
+        console.warn('Could not save shop open status to localStorage:', e);
+      }
+    }
+
+    // 2. Synchronize to shared storefront storage
+    const currentShopName =
+      shopName.trim() ||
+      user?.shopDetails?.shopName?.trim() ||
+      (user?.name ? `${user.name}'s Store` : 'My Hyperlocal Store');
+    const currentCategory = category.trim() || user?.shopDetails?.category?.trim() || 'Retail & Grocery';
+    const currentAddress = address.trim() || user?.shopDetails?.address?.trim() || 'Store address not set';
+    const currentImage = localShopImage || user?.shopDetails?.image?.trim() || '';
+
+    syncShopImageToStorage({
+      shopName: currentShopName,
+      image: currentImage,
+      category: currentCategory,
+      address: currentAddress,
+      ownerId: user?.id,
+      ownerEmail: user?.email,
+      isOpen: nextStatus,
+    });
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('qb_shop_details_updated', {
+          detail: { isOpen: nextStatus },
+        })
+      );
+    }
+
+    // 3. Persist to MongoDB via updateShopDetails
+    try {
+      await updateShopDetails({
+        isOpen: nextStatus,
+      });
+    } catch (err) {
+      console.error('Failed to sync shop open status to backend:', err);
+    }
+  };
 
   // Dynamic metrics computed from actual merchant data
   const totalRevenue = orders.reduce((acc, ord) => acc + ord.total, 0);
@@ -931,11 +1114,15 @@ export default function ShopOwnerDashboard() {
         <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-10 bg-radial from-white to-transparent pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-5">
-            {/* Shop Image avatar in banner with interactive Change / Add Photo trigger */}
+            {/* Shop Image avatar in banner with interactive View / Change Photo trigger */}
             <div className="relative group">
               {shopImage ? (
-                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/50 shadow-md shrink-0 bg-white">
-                  <img src={shopImage} alt={shopName} className="w-full h-full object-cover" />
+                <div
+                  onClick={() => setIsShopImageModalOpen(true)}
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-white/50 shadow-md shrink-0 bg-white cursor-pointer group/banner"
+                  title="Click to view storefront photo"
+                >
+                  <img src={shopImage} alt={shopName} className="w-full h-full object-cover group-hover/banner:scale-105 transition-transform duration-300" />
                 </div>
               ) : (
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-white/10 border-2 border-dashed border-white/30 flex flex-col items-center justify-center text-emerald-200 shrink-0">
@@ -943,15 +1130,34 @@ export default function ShopOwnerDashboard() {
                   <span className="text-[10px] text-white/80 font-bold">No Image</span>
                 </div>
               )}
-              <button
-                type="button"
-                onClick={() => bannerFileInputRef.current?.click()}
-                className="absolute inset-0 bg-slate-950/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-bold cursor-pointer backdrop-blur-2xs shadow-md"
-                title="Click to change shop image"
-              >
-                <Camera className="w-4 h-4 mb-0.5" />
-                <span>{shopImage ? 'Change' : '+ Add'}</span>
-              </button>
+              <div className="absolute inset-0 bg-slate-950/60 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 text-white text-[10px] font-bold backdrop-blur-2xs shadow-md pointer-events-none group-hover:pointer-events-auto">
+                {shopImage && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsShopImageModalOpen(true);
+                    }}
+                    className="hover:underline flex items-center gap-1 text-white text-[10px] font-bold cursor-pointer"
+                    title="View storefront photo"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>View</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    bannerFileInputRef.current?.click();
+                  }}
+                  className="hover:underline flex items-center gap-1 text-emerald-300 text-[10px] font-bold cursor-pointer"
+                  title="Upload new shop photo"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>{shopImage ? 'Change' : '+ Add'}</span>
+                </button>
+              </div>
             </div>
             <input
               type="file"
@@ -997,7 +1203,7 @@ export default function ShopOwnerDashboard() {
             <span className="text-xs font-medium text-emerald-100 mb-2">Store Order Receiving</span>
             <button
               type="button"
-              onClick={() => setIsOpen(!isOpen)}
+              onClick={handleToggleStoreOpen}
               className={`w-full py-2 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                 isOpen
                   ? 'bg-emerald-400 text-emerald-950 shadow-md hover:bg-emerald-300'
@@ -1015,30 +1221,30 @@ export default function ShopOwnerDashboard() {
       </div>
 
       {/* Shop Owner Details Card with Fully Functional Edit Option Top Right */}
-      <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between gap-3 pb-3 border-b border-emerald-100">
-          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <UserCheck className="w-4 h-4 text-emerald-600" />
-            <span>Shop Owner Details</span>
+      <div className="bg-white rounded-3xl border border-emerald-200/80 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 pb-3 border-b border-emerald-100">
+          <h2 className="text-xs xs:text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink min-w-0">
+            <UserCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+            <span className="whitespace-nowrap">Shop Owner Details</span>
           </h2>
           {!isEditingOwner ? (
             <button
               type="button"
               onClick={handleStartEditOwner}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Edit Shop Owner Details"
             >
-              <Edit2 className="w-3.5 h-3.5" />
+              <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>Edit</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleCancelEditOwner}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Cancel Editing"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>Cancel</span>
             </button>
           )}
@@ -1163,30 +1369,30 @@ export default function ShopOwnerDashboard() {
       </div>
 
       {/* Registered Storefront Details Card with Edit & Shop Image */}
-      <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between gap-3 pb-3 border-b border-emerald-100">
-          <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-            <Store className="w-4 h-4 text-emerald-600" />
-            <span>Registered Storefront Details</span>
+      <div className="bg-white rounded-3xl border border-emerald-200/80 p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 pb-3 border-b border-emerald-100">
+          <h2 className="text-xs xs:text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink min-w-0">
+            <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+            <span className="whitespace-nowrap">Registered Storefront Details</span>
           </h2>
           {!isEditingStore ? (
             <button
               type="button"
               onClick={handleStartEditStore}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Edit Storefront Details & Shop Image"
             >
-              <Edit2 className="w-3.5 h-3.5" />
+              <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>Edit</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={handleCancelEditStore}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs cursor-pointer shrink-0"
               title="Cancel Editing"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               <span>Cancel</span>
             </button>
           )}
@@ -1200,47 +1406,237 @@ export default function ShopOwnerDashboard() {
         )}
 
         {!isEditingStore ? (
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-            {/* Shop Image Box */}
-            <div className="sm:col-span-1 p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col items-center justify-center text-center space-y-2">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
-                Shop Image
-              </span>
-              {shopImage ? (
-                <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white">
-                  <img
-                    src={shopImage}
-                    alt={shopName}
-                    className="w-full h-full object-cover"
+          <div>
+            {/* Mobile View: Smooth Touch Carousel (< sm) */}
+            <div className="block sm:hidden space-y-3">
+              {/* Carousel Header Controls */}
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200">
+                    {storeSlideIndex + 1} / 4
+                  </span>
+                  <span className="text-[11px] font-bold text-slate-700">
+                    {storeSlideIndex === 0 && 'Shop Image'}
+                    {storeSlideIndex === 1 && 'Shop Name'}
+                    {storeSlideIndex === 2 && 'Store Category'}
+                    {storeSlideIndex === 3 && 'Store Address'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setStoreSlideIndex((prev) => (prev > 0 ? prev - 1 : 3))}
+                    className="w-7 h-7 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200 flex items-center justify-center text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                    aria-label="Previous slide"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStoreSlideIndex((prev) => (prev < 3 ? prev + 1 : 0))}
+                    className="w-7 h-7 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200 flex items-center justify-center text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Carousel Track Viewport */}
+              <div className="overflow-hidden rounded-2xl w-full border border-emerald-100 bg-emerald-50/20">
+                <div
+                  className="flex transition-transform duration-300 ease-out"
+                  style={{ transform: `translateX(-${storeSlideIndex * 100}%)` }}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  {/* Slide 1: Shop Image */}
+                  <div className="w-full shrink-0 p-3.5 flex flex-col items-center justify-center text-center space-y-2 min-h-[175px]">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
+                      Shop Image
+                    </span>
+                    {shopImage ? (
+                      <div
+                        onClick={() => setIsShopImageModalOpen(true)}
+                        className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white shrink-0 cursor-pointer"
+                        title="Click to view full storefront photo"
+                      >
+                        <img
+                          src={shopImage}
+                          alt={shopName}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                          <Eye className="w-4 h-4 drop-shadow-sm" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-20 h-20 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700 shrink-0">
+                        <Camera className="w-6 h-6 text-emerald-600 mb-1" />
+                        <span className="text-[10px] font-semibold text-slate-500">No Image</span>
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleStartEditStore}
+                      className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                    >
+                      {shopImage ? 'Change Photo' : '+ Add Photo'}
+                    </button>
+                  </div>
+
+                  {/* Slide 2: Shop Name */}
+                  <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Store className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Shop Name</span>
+                      </span>
+                      <p className="font-extrabold text-slate-900 text-base leading-snug break-words">{shopName}</p>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block">
+                        Verified Store
+                      </span>
+                      <span className="text-[10px] text-slate-500">Live Catalog</span>
+                    </div>
+                  </div>
+
+                  {/* Slide 3: Store Category */}
+                  <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Store Category</span>
+                      </span>
+                      <p className="font-bold text-slate-800 text-base break-words">{category || 'General Store'}</p>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500">Primary Retail Category</span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block">
+                        Active
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Slide 4: Store Address */}
+                  <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                    <div className="space-y-1">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Store Address</span>
+                      </span>
+                      <p className="font-semibold text-slate-800 text-xs leading-relaxed break-words line-clamp-3" title={address}>
+                        {address || 'Not specified'}
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                      <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>Pickup Location</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pagination Dots */}
+              <div className="flex items-center justify-center gap-2 pt-1">
+                {[0, 1, 2, 3].map((idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setStoreSlideIndex(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                      storeSlideIndex === idx
+                        ? 'w-7 bg-emerald-600'
+                        : 'w-2 bg-emerald-200 hover:bg-emerald-300'
+                    }`}
+                    aria-label={`Go to slide ${idx + 1}`}
                   />
-                </div>
-              ) : (
-                <div className="w-24 h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700">
-                  <Camera className="w-6 h-6 text-emerald-600 mb-1" />
-                  <span className="text-[10px] font-semibold text-slate-500">No Image</span>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handleStartEditStore}
-                className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
-              >
-                {shopImage ? 'Change Photo' : '+ Add Photo'}
-              </button>
+                ))}
+              </div>
             </div>
 
-            <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Shop Name</span>
-                <p className="font-extrabold text-slate-900 text-sm">{shopName}</p>
+            {/* Desktop / Tablet View: 4-Column Single Row (>= sm) */}
+            <div className="hidden sm:grid sm:grid-cols-4 gap-3 text-xs">
+              {/* 1. Shop Image Box */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col items-center justify-center text-center space-y-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
+                  Shop Image
+                </span>
+                {shopImage ? (
+                  <div
+                    onClick={() => setIsShopImageModalOpen(true)}
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white shrink-0 cursor-pointer"
+                    title="Click to view full storefront photo"
+                  >
+                    <img
+                      src={shopImage}
+                      alt={shopName}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                      <Eye className="w-4 h-4 drop-shadow-sm" />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700 shrink-0">
+                    <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 mb-1" />
+                    <span className="text-[10px] font-semibold text-slate-500">No Image</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={handleStartEditStore}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer whitespace-nowrap"
+                >
+                  {shopImage ? 'Change Photo' : '+ Add Photo'}
+                </button>
               </div>
-              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Category</span>
-                <p className="font-semibold text-slate-800">{category}</p>
+
+              {/* 2. Shop Name */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <Store className="w-3 h-3 text-emerald-600" />
+                    <span>Shop Name</span>
+                  </span>
+                  <p className="font-extrabold text-slate-900 text-sm break-words">{shopName}</p>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block w-fit">
+                  Verified Store
+                </span>
               </div>
-              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Address</span>
-                <p className="font-semibold text-slate-800">{address}</p>
+
+              {/* 3. Store Category */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-emerald-600" />
+                    <span>Store Category</span>
+                  </span>
+                  <p className="font-semibold text-slate-800 break-words">{category || 'General Store'}</p>
+                </div>
+                <span className="text-[10px] text-slate-500">
+                  Catalog Active
+                </span>
+              </div>
+
+              {/* 4. Store Address */}
+              <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                <div className="space-y-1">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-emerald-600" />
+                    <span>Store Address</span>
+                  </span>
+                  <p className="font-semibold text-slate-800 break-words line-clamp-3" title={address}>{address || 'Not specified'}</p>
+                </div>
+                <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                  <span>Pickup Location</span>
+                </span>
               </div>
             </div>
           </div>
@@ -1253,8 +1649,8 @@ export default function ShopOwnerDashboard() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
+            <div className="flex flex-row flex-nowrap items-stretch gap-3 overflow-x-auto scrollbar-none pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible">
+              <div className="min-w-[180px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                   Shop Name <span className="text-red-500">*</span>
                 </label>
@@ -1268,7 +1664,7 @@ export default function ShopOwnerDashboard() {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[180px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                   Store Category
                 </label>
@@ -1281,7 +1677,7 @@ export default function ShopOwnerDashboard() {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-[200px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                   Store Address / Location
                 </label>
@@ -1475,21 +1871,21 @@ export default function ShopOwnerDashboard() {
       {/* Main Workspace: Tab Navigation */}
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-          {/* Single-Row Segmented Tab Bar */}
-          <div className="flex items-center p-1.5 bg-slate-100/90 rounded-2xl border border-slate-200/60 overflow-x-auto scrollbar-none gap-1.5 shrink-0">
+          {/* Responsive Segmented Tab Bar: Strictly Single Row on All Devices */}
+          <div className="w-full sm:w-auto grid grid-cols-2 sm:flex sm:items-center p-1 sm:p-1.5 bg-slate-100/95 rounded-2xl border border-slate-200/80 gap-1 sm:gap-1.5 shadow-2xs overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => setActiveTab('catalog')}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition-all cursor-pointer ${
+              className={`w-full sm:w-auto px-1.5 min-[380px]:px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[10px] min-[360px]:text-[11px] min-[400px]:text-xs sm:text-sm font-bold flex items-center justify-center gap-1 min-[380px]:gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'catalog'
                   ? 'bg-white text-emerald-800 shadow-sm border border-emerald-100'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <Package className={`w-4 h-4 shrink-0 ${activeTab === 'catalog' ? 'text-emerald-600' : 'text-slate-400'}`} />
-              <span className="whitespace-nowrap">Store Product Catalog</span>
+              <Package className={`w-3 h-3 min-[380px]:w-3.5 min-[380px]:h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'catalog' ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap font-bold tracking-tight">Store Product Catalog</span>
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                className={`text-[9px] min-[380px]:text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
                   activeTab === 'catalog'
                     ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200/80 text-slate-600'
@@ -1502,16 +1898,16 @@ export default function ShopOwnerDashboard() {
             <button
               type="button"
               onClick={() => setActiveTab('orders')}
-              className={`whitespace-nowrap px-4 py-2 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition-all cursor-pointer ${
+              className={`w-full sm:w-auto px-1.5 min-[380px]:px-2.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[10px] min-[360px]:text-[11px] min-[400px]:text-xs sm:text-sm font-bold flex items-center justify-center gap-1 min-[380px]:gap-1.5 sm:gap-2 transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'orders'
                   ? 'bg-white text-emerald-800 shadow-sm border border-emerald-100'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
               }`}
             >
-              <ShoppingBag className={`w-4 h-4 shrink-0 ${activeTab === 'orders' ? 'text-emerald-600' : 'text-slate-400'}`} />
-              <span className="whitespace-nowrap">Live Incoming Orders</span>
+              <ShoppingBag className={`w-3 h-3 min-[380px]:w-3.5 min-[380px]:h-3.5 sm:w-4 sm:h-4 shrink-0 ${activeTab === 'orders' ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <span className="whitespace-nowrap font-bold tracking-tight">Live Incoming Orders</span>
               <span
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                className={`text-[9px] min-[380px]:text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
                   activeTab === 'orders'
                     ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200/80 text-slate-600'
@@ -1526,7 +1922,7 @@ export default function ShopOwnerDashboard() {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="whitespace-nowrap inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm transition-all cursor-pointer self-start sm:self-auto"
+              className="w-full sm:w-auto justify-center whitespace-nowrap inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm transition-all cursor-pointer shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>Add New Product</span>
@@ -1682,11 +2078,11 @@ export default function ShopOwnerDashboard() {
         {activeTab === 'orders' && (
           <div className="space-y-4">
             {/* Header bar with Refresh */}
-            <div className="flex items-center justify-between pb-2">
+            <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 pb-2">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-                  <ShoppingBag className="w-4 h-4 text-emerald-600" />
-                  <span>Store Orders &amp; Fulfillment</span>
+                <h2 className="text-sm xs:text-base font-extrabold text-slate-900 flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Live Incoming Orders &amp; Fulfillment</span>
                 </h2>
                 <p className="text-xs text-slate-500">
                   Accept incoming customer orders and track delivery partner handoff in real time.
@@ -1729,18 +2125,19 @@ export default function ShopOwnerDashboard() {
                   const isFinding = ord.status === 'FINDING_RIDER' || ord.status === 'SHOP_ACCEPTED' || ord.status === 'confirmed';
                   const isRiderAssigned = ord.status === 'RIDER_ASSIGNED';
                   const isRiderAccepted = ord.status === 'RIDER_ACCEPTED';
-                  const isOut = ord.status === 'PICKED_UP' || ord.status === 'OUT_FOR_DELIVERY';
+                  const isPickedUp = ord.status === 'PICKED_UP';
+                  const isOut = ord.status === 'OUT_FOR_DELIVERY';
                   const isDelivered = ord.status === 'DELIVERED' || ord.status === 'delivered';
                   const isCancelled = ord.status === 'CANCELLED' || ord.status === 'cancelled';
 
                   return (
                     <div
                       key={ord.id}
-                      className="qb-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-200/80 hover:border-emerald-300 transition-all"
+                      className="qb-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-start justify-between gap-4 border border-slate-200/80 hover:border-emerald-300 transition-all"
                     >
-                      <div className="space-y-1.5 min-w-0">
+                      <div className="space-y-2.5 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-extrabold text-slate-900">
+                          <span className="text-xs font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200">
                             #{ord.id.slice(-6).toUpperCase()}
                           </span>
                           <span className="text-xs text-slate-400">•</span>
@@ -1748,10 +2145,13 @@ export default function ShopOwnerDashboard() {
                             {ord.customer}
                           </span>
                           {ord.customerPhone && (
-                            <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                              <Phone className="w-3 h-3 text-slate-400" />
-                              {ord.customerPhone}
-                            </span>
+                            <a
+                              href={`tel:${ord.customerPhone}`}
+                              className="text-[11px] text-emerald-700 font-semibold hover:underline flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100"
+                            >
+                              <Phone className="w-3 h-3 text-emerald-600" />
+                              <span>{ord.customerPhone}</span>
+                            </a>
                           )}
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -1760,42 +2160,82 @@ export default function ShopOwnerDashboard() {
                                 : isCancelled
                                 ? 'bg-rose-100 text-rose-800'
                                 : isOut
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 animate-pulse'
+                                : isPickedUp
+                                ? 'bg-amber-100 text-amber-900 border border-amber-200'
                                 : isRiderAccepted
                                 ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                 : isRiderAssigned
                                 ? 'bg-blue-50 text-blue-700 border border-blue-200'
                                 : isFinding
                                 ? 'bg-amber-100 text-amber-800 animate-pulse'
-                                : 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                             }`}
                           >
-                            {ord.status.replace(/_/g, ' ')}
+                            {isPickedUp ? 'ORDER PICKED UP' : ord.status.replace(/_/g, ' ')}
                           </span>
                         </div>
 
-                        <p className="text-xs text-slate-600 font-medium line-clamp-2">
-                          <span className="font-bold text-slate-700">Items: </span>
+                        <p className="text-xs text-slate-700 font-medium">
+                          <span className="font-bold text-slate-900">Ordered Items: </span>
                           {ord.items}
                         </p>
 
+                        {/* Complete Customer Delivery Location */}
                         {ord.deliveryAddress && (
-                          <p className="text-[11px] text-slate-500 flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{ord.deliveryAddress}</span>
-                          </p>
+                          <div className="text-[11px] text-slate-600 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/70 space-y-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>Customer Delivery Location:</span>
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                {ord.customerAddressLabel || 'Home'}
+                              </span>
+                            </div>
+                            <p className="text-slate-700 pl-5 leading-relaxed">
+                              {ord.deliveryAddress}
+                              {ord.customerLandmark && (
+                                <span className="text-slate-500 font-medium"> • Landmark: {ord.customerLandmark}</span>
+                              )}
+                            </p>
+                            {ord.customerLocationCoordinates && (
+                              <div className="pl-5 pt-0.5">
+                                <a
+                                  href={`https://www.google.com/maps/search/?api=1&query=${ord.customerLocationCoordinates[1]},${ord.customerLocationCoordinates[0]}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] text-emerald-700 hover:text-emerald-800 font-bold hover:underline"
+                                >
+                                  <Navigation className="w-3 h-3 text-emerald-600" />
+                                  <span>View on Google Maps ({ord.customerLocationCoordinates[1].toFixed(4)}, {ord.customerLocationCoordinates[0].toFixed(4)})</span>
+                                </a>
+                              </div>
+                            )}
+                          </div>
                         )}
 
+                        {/* Assigned Rider Info */}
                         {ord.deliveryPartnerName && (
-                          <p className="text-[11px] text-indigo-700 font-semibold flex items-center gap-1">
-                            <Bike className="w-3 h-3 text-indigo-600 shrink-0" />
-                            <span>Rider: {ord.deliveryPartnerName}</span>
-                          </p>
+                          <div className="text-[11px] text-indigo-900 bg-indigo-50/70 p-2 rounded-xl border border-indigo-100 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <Bike className="w-4 h-4 text-indigo-600 shrink-0" />
+                              <span>
+                                <strong>Rider:</strong> {ord.deliveryPartnerName}
+                                {ord.deliveryPartnerPhone ? ` • ${ord.deliveryPartnerPhone}` : ''}
+                                {ord.deliveryPartnerVehicle ? ` (${ord.deliveryPartnerVehicle})` : ''}
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700">
+                              {isPickedUp ? 'Package Collected' : isOut ? 'Delivering' : 'Heading to Store'}
+                            </span>
+                          </div>
                         )}
                       </div>
 
-                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                        <span className="text-base font-extrabold text-slate-900">
+                      {/* Right Column: Price & Real-time Action Buttons */}
+                      <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 min-w-[180px]">
+                        <span className="text-lg font-black text-slate-900">
                           ₹{ord.total}
                         </span>
 
@@ -1804,12 +2244,12 @@ export default function ShopOwnerDashboard() {
                             type="button"
                             onClick={() => handleAcceptOrder(ord.id)}
                             disabled={actionInProgress === ord.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                           >
                             {actionInProgress === ord.id ? (
                               <>
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                <span>Accepting...</span>
+                                <span>Dispatching...</span>
                               </>
                             ) : (
                               <>
@@ -1821,27 +2261,64 @@ export default function ShopOwnerDashboard() {
                         ) : isFinding ? (
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200">
                             <Clock className="w-3.5 h-3.5 animate-spin" />
-                            <span>Locating Rider...</span>
+                            <span>Locating Nearest Rider...</span>
                           </span>
                         ) : isRiderAssigned ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
-                            <Bike className="w-3.5 h-3.5" />
-                            <span>Awaiting Rider Accept</span>
-                          </span>
+                          <div className="space-y-1 text-right">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200">
+                              <Bike className="w-3.5 h-3.5" />
+                              <span>Rider Assigned (Awaiting Accept)</span>
+                            </span>
+                          </div>
                         ) : isRiderAccepted ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200">
-                            <Bike className="w-3.5 h-3.5" />
-                            <span>Rider Heading to Store</span>
-                          </span>
+                          <div className="space-y-1.5 text-right w-full sm:w-auto">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-xl bg-indigo-50 text-indigo-800 border border-indigo-200">
+                              <Bike className="w-3.5 h-3.5" />
+                              <span>Rider Heading to Store</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setTrackingOrderId(ord.id)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                            >
+                              <Navigation className="w-3.5 h-3.5" />
+                              <span>Track Live Rider</span>
+                            </button>
+                          </div>
+                        ) : isPickedUp ? (
+                          <div className="space-y-1.5 text-right w-full sm:w-auto">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-200">
+                              <Package className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Order Picked Up</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setTrackingOrderId(ord.id)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                            >
+                              <Navigation className="w-3.5 h-3.5" />
+                              <span>Track Live Delivery</span>
+                            </button>
+                          </div>
                         ) : isOut ? (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200">
-                            <Navigation className="w-3.5 h-3.5" />
-                            <span>Out for Delivery</span>
-                          </span>
+                          <div className="space-y-1.5 text-right w-full sm:w-auto">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 animate-pulse">
+                              <Navigation className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Out for Delivery</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setTrackingOrderId(ord.id)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+                            >
+                              <Navigation className="w-3.5 h-3.5" />
+                              <span>Track Live Delivery</span>
+                            </button>
+                          </div>
                         ) : isDelivered ? (
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 border border-slate-200">
                             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Delivered</span>
+                            <span>Delivered Successfully</span>
                           </span>
                         ) : null}
                       </div>
@@ -2224,6 +2701,41 @@ export default function ShopOwnerDashboard() {
           </div>
         </div>
       )}
+
+      {/* Live Rider GPS Tracking & Order Lifecycle Modal (Zomato-style for Shop Owner) */}
+      {trackingOrderId && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setTrackingOrderId(null)}
+        >
+          <div
+            className="w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <LiveOrderTracker
+              orderId={trackingOrderId}
+              isModal={true}
+              onClose={() => setTrackingOrderId(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Storefront Full Image Preview Modal (like ProductImageModal) */}
+      <ShopImageModal
+        shop={{
+          name: shopName,
+          image: shopImage,
+          category,
+          address,
+          isOpen,
+          productCount: products.length,
+        }}
+        isOpen={isShopImageModalOpen}
+        onClose={() => setIsShopImageModalOpen(false)}
+        isOwner={true}
+        onEditImage={handleStartEditStore}
+      />
     </div>
   );
 }

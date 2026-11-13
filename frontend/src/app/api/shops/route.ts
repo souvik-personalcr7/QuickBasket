@@ -50,16 +50,24 @@ export async function GET() {
           'Hyperlocal Market',
         ownerId: shopId,
         ownerEmail: owner.email,
-        isOpen: true,
+        isOpen: owner.shopDetails?.isOpen !== undefined ? owner.shopDetails.isOpen : true,
         productCount: count,
       });
     }
 
     // Also include any shops that have products in the Product collection but weren't in shopOwners
+    const seenShopIds = new Set<string>();
+    for (const s of shopMap.values()) {
+      if (s.id) seenShopIds.add(s.id.toLowerCase());
+    }
+
     for (const prod of products) {
       if (!prod.shopName) continue;
       const normKey = prod.shopName.toLowerCase().trim();
-      if (!shopMap.has(normKey)) {
+      const resolvedProdShopId = (prod.shopId || `shop_${encodeURIComponent(prod.shopName)}`).toLowerCase();
+
+      if (!shopMap.has(normKey) && !seenShopIds.has(resolvedProdShopId)) {
+        seenShopIds.add(resolvedProdShopId);
         const count = products.filter(
           (p) => p.shopName && p.shopName.toLowerCase().trim() === normKey
         ).length;

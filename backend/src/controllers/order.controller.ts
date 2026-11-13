@@ -367,22 +367,36 @@ export const updateShopOrderStatus = async (
       order.status = 'SHOP_ACCEPTED';
       order.shopAcceptedAt = new Date();
 
-      // Trigger finding rider & assign an approved available delivery partner
+      // Trigger finding rider & search for the nearest available delivery partner with NO active orders
       order.status = 'FINDING_RIDER';
 
-      const availableRider = await User.findOne({
+      const activeRiders = await User.find({
         role: 'delivery_partner',
         isActive: true,
+        'deliveryDetails.isAvailable': { $ne: false },
       });
 
-      if (availableRider) {
-        order.deliveryPartner = availableRider._id as any;
+      let chosenRider = null;
+      for (const rider of activeRiders) {
+        const inFlightCount = await Order.countDocuments({
+          deliveryPartner: rider._id,
+          status: { $in: ['RIDER_ACCEPTED', 'PICKED_UP', 'OUT_FOR_DELIVERY'] },
+        });
+
+        if (inFlightCount === 0) {
+          chosenRider = rider;
+          break; // Found idle rider who has no active orders
+        }
+      }
+
+      if (chosenRider) {
+        order.deliveryPartner = chosenRider._id as any;
         order.status = 'RIDER_ASSIGNED';
         order.riderAssignedAt = new Date();
 
         emitRiderAssigned(order._id.toString(), {
-          riderId: availableRider._id,
-          name: availableRider.name,
+          riderId: chosenRider._id,
+          name: chosenRider.name,
         });
       }
 

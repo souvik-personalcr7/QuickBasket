@@ -16,6 +16,7 @@ export interface IShopDetails {
   address?: string;
   image?: string;
   isApproved?: boolean;
+  isOpen?: boolean;
 }
 
 export interface IDeliveryDetails {
@@ -98,6 +99,7 @@ const UserSchema = new Schema<IUser>(
       address: { type: String, trim: true, default: '' },
       image: { type: String, trim: true, default: '' },
       isApproved: { type: Boolean, default: true },
+      isOpen: { type: Boolean, default: true },
     },
     deliveryDetails: {
       vehicleType: { type: String, trim: true, default: '' },

@@ -26,6 +26,10 @@ import {
   Upload,
   Trash2,
   Image as ImageIcon,
+  Tag,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Address } from '@/types/address';
@@ -33,6 +37,7 @@ import { fetchAddresses } from '@/lib/addressApi';
 import { compressImageFile, syncShopImageToStorage, getStoredShopImage } from '@/lib/imageUtils';
 import { apiClient } from '@/lib/api';
 import { TrackOrderModal } from '@/components/orders/TrackOrderModal';
+import { ShopImageModal } from '@/components/home/ShopImageModal';
 
 export default function ProfilePage() {
   const { user, isAuthenticated, isLoading, logout, role, getRoleRedirectPath, updateUserAddress, updateShopDetails, updateUserProfile } = useAuth();
@@ -133,6 +138,33 @@ export default function ProfilePage() {
   const [isSavingShop, setIsSavingShop] = useState(false);
   const [shopError, setShopError] = useState<string | null>(null);
   const [shopSuccess, setShopSuccess] = useState<string | null>(null);
+  const [isShopImageModalOpen, setIsShopImageModalOpen] = useState(false);
+
+  // Registered Storefront Carousel State & Smooth Touch Swipe for Mobile
+  const [storeSlideIndex, setStoreSlideIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchEndX, setTouchEndX] = useState<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEndX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartX === null || touchEndX === null) return;
+    const distance = touchStartX - touchEndX;
+    if (distance > 40) {
+      // Swiped left -> next slide
+      setStoreSlideIndex((prev) => (prev < 3 ? prev + 1 : 0));
+    } else if (distance < -40) {
+      // Swiped right -> prev slide
+      setStoreSlideIndex((prev) => (prev > 0 ? prev - 1 : 3));
+    }
+  };
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -501,37 +533,37 @@ export default function ProfilePage() {
 
       {/* Shop Owner Registered Details */}
       {role === 'shop_owner' && user.shopDetails && (
-        <div className="bg-white rounded-3xl border border-emerald-200/80 p-6 shadow-xs space-y-4">
-          <div className="flex items-center justify-between gap-3 pb-3 border-b border-emerald-100">
-            <h2 className="text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-2 whitespace-nowrap min-w-0">
-              <Store className="w-4 h-4 text-emerald-600 shrink-0" />
+        <div className="bg-white rounded-3xl border border-emerald-200/80 p-4 sm:p-6 shadow-xs space-y-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-3 pb-3 border-b border-emerald-100">
+            <h2 className="text-xs xs:text-sm sm:text-base font-extrabold text-slate-900 flex items-center gap-1.5 sm:gap-2 whitespace-nowrap shrink min-w-0">
+              <Store className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
               <span className="whitespace-nowrap">Registered Storefront Details</span>
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               {!isEditingShop ? (
                 <button
                   type="button"
                   onClick={handleStartEditShop}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors shadow-2xs shrink-0 cursor-pointer"
                   title="Edit Storefront Details & Shop Image"
                 >
-                  <Edit2 className="w-3.5 h-3.5" />
+                  <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>Edit</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleCancelEditShop}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs"
+                  className="inline-flex items-center gap-1 sm:gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors shadow-2xs shrink-0 cursor-pointer"
                   title="Cancel Editing"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span>Cancel</span>
                 </button>
               )}
               <Link
                 href="/shop"
-                className="text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-xl border border-emerald-200 transition-colors"
+                className="text-[11px] sm:text-xs font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl border border-emerald-200 transition-colors shrink-0"
               >
                 Manage Catalog &rarr;
               </Link>
@@ -546,47 +578,247 @@ export default function ProfilePage() {
           )}
 
           {!isEditingShop ? (
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs">
-              {/* Shop Image Box */}
-              <div className="sm:col-span-1 p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col items-center justify-center text-center space-y-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
-                  Shop Image
-                </span>
-                {user.shopDetails.image ? (
-                  <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white">
-                    <img
-                      src={user.shopDetails.image}
-                      alt={user.shopDetails.shopName || 'Shop storefront'}
-                      className="w-full h-full object-cover"
+            <div>
+              {/* Mobile View: Smooth Touch Carousel (< sm) */}
+              <div className="block sm:hidden space-y-3">
+                {/* Carousel Header Controls */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {storeSlideIndex + 1} / 4
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-700">
+                      {storeSlideIndex === 0 && 'Shop Image'}
+                      {storeSlideIndex === 1 && 'Shop Name'}
+                      {storeSlideIndex === 2 && 'Store Category'}
+                      {storeSlideIndex === 3 && 'Store Address'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setStoreSlideIndex((prev) => (prev > 0 ? prev - 1 : 3))}
+                      className="w-7 h-7 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200 flex items-center justify-center text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                      aria-label="Previous slide"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStoreSlideIndex((prev) => (prev < 3 ? prev + 1 : 0))}
+                      className="w-7 h-7 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:scale-95 border border-emerald-200 flex items-center justify-center text-emerald-800 transition-all cursor-pointer shadow-2xs"
+                      aria-label="Next slide"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Carousel Track Viewport */}
+                <div className="overflow-hidden rounded-2xl w-full border border-emerald-100 bg-emerald-50/20">
+                  <div
+                    className="flex transition-transform duration-300 ease-out"
+                    style={{ transform: `translateX(-${storeSlideIndex * 100}%)` }}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    {/* Slide 1: Shop Image */}
+                    <div className="w-full shrink-0 p-3.5 flex flex-col items-center justify-center text-center space-y-2 min-h-[175px]">
+                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
+                        Shop Image
+                      </span>
+                      {user.shopDetails?.image ? (
+                        <div
+                          onClick={() => setIsShopImageModalOpen(true)}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white shrink-0 cursor-pointer"
+                          title="Click to view full storefront photo"
+                        >
+                          <img
+                            src={user.shopDetails.image}
+                            alt={user.shopDetails.shopName || 'Shop storefront'}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                            <Eye className="w-4 h-4 drop-shadow-sm" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700 shrink-0">
+                          <Camera className="w-6 h-6 text-emerald-600 mb-1" />
+                          <span className="text-[10px] font-semibold text-slate-500">No Image</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleStartEditShop}
+                        className="text-xs font-bold text-emerald-700 hover:underline cursor-pointer"
+                      >
+                        {user.shopDetails?.image ? 'Change Photo' : '+ Add Photo'}
+                      </button>
+                    </div>
+
+                    {/* Slide 2: Shop Name */}
+                    <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <Store className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Shop Name</span>
+                        </span>
+                        <p className="font-extrabold text-slate-900 text-base leading-snug break-words">
+                          {user.shopDetails?.shopName || 'Not specified'}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block">
+                          Verified Store
+                        </span>
+                        <span className="text-[10px] text-slate-500">Live Catalog</span>
+                      </div>
+                    </div>
+
+                    {/* Slide 3: Store Category */}
+                    <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <Tag className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Store Category</span>
+                        </span>
+                        <p className="font-bold text-slate-800 text-base break-words">
+                          {user.shopDetails?.category || 'General Store'}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-500">Primary Retail Category</span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block">
+                          Active
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Slide 4: Store Address */}
+                    <div className="w-full shrink-0 p-3.5 flex flex-col justify-between space-y-3 min-h-[175px]">
+                      <div className="space-y-1">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Store Address</span>
+                        </span>
+                        <p className="font-semibold text-slate-800 text-xs leading-relaxed break-words line-clamp-3" title={user.shopDetails?.address}>
+                          {user.shopDetails?.address || 'Address not configured'}
+                        </p>
+                      </div>
+                      <div className="pt-2 border-t border-emerald-100/80 flex items-center justify-between">
+                        <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Pickup Location</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pagination Dots */}
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  {[0, 1, 2, 3].map((idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setStoreSlideIndex(idx)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        storeSlideIndex === idx
+                          ? 'w-7 bg-emerald-600'
+                          : 'w-2 bg-emerald-200 hover:bg-emerald-300'
+                      }`}
+                      aria-label={`Go to slide ${idx + 1}`}
                     />
-                  </div>
-                ) : (
-                  <div className="w-24 h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700">
-                    <Camera className="w-6 h-6 text-emerald-600 mb-1" />
-                    <span className="text-[10px] font-semibold text-slate-500">No Image</span>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={handleStartEditShop}
-                  className="text-[11px] font-bold text-emerald-700 hover:underline"
-                >
-                  {user.shopDetails.image ? 'Change Photo' : '+ Add Photo'}
-                </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="sm:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Shop Name</span>
-                  <p className="font-extrabold text-slate-900 text-sm">{user.shopDetails.shopName || 'Not specified'}</p>
+              {/* Desktop / Tablet View: 4-Column Single Row (>= sm) */}
+              <div className="hidden sm:grid sm:grid-cols-4 gap-3 text-xs">
+                {/* 1. Shop Image Box */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col items-center justify-center text-center space-y-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block self-start">
+                    Shop Image
+                  </span>
+                  {user.shopDetails?.image ? (
+                    <div
+                      onClick={() => setIsShopImageModalOpen(true)}
+                      className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-2 border-emerald-200 shadow-sm relative group bg-white shrink-0 cursor-pointer"
+                      title="Click to view full storefront photo"
+                    >
+                      <img
+                        src={user.shopDetails.image}
+                        alt={user.shopDetails.shopName || 'Shop storefront'}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                        <Eye className="w-4 h-4 drop-shadow-sm" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-emerald-100/60 border border-dashed border-emerald-300 flex flex-col items-center justify-center text-emerald-700 shrink-0">
+                      <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 mb-1" />
+                      <span className="text-[10px] font-semibold text-slate-500">No Image</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleStartEditShop}
+                    className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer whitespace-nowrap"
+                  >
+                    {user.shopDetails?.image ? 'Change Photo' : '+ Add Photo'}
+                  </button>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Category</span>
-                  <p className="font-semibold text-slate-800">{user.shopDetails.category || 'General Store'}</p>
+
+                {/* 2. Shop Name */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <Store className="w-3 h-3 text-emerald-600" />
+                      <span>Shop Name</span>
+                    </span>
+                    <p className="font-extrabold text-slate-900 text-sm break-words">
+                      {user.shopDetails?.shopName || 'Not specified'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md inline-block w-fit">
+                    Verified Store
+                  </span>
                 </div>
-                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 space-y-1">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Store Address</span>
-                  <p className="font-semibold text-slate-800">{user.shopDetails.address || 'Address not configured'}</p>
+
+                {/* 3. Store Category */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <Tag className="w-3 h-3 text-emerald-600" />
+                      <span>Store Category</span>
+                    </span>
+                    <p className="font-semibold text-slate-800 break-words">
+                      {user.shopDetails?.category || 'General Store'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    Catalog Active
+                  </span>
+                </div>
+
+                {/* 4. Store Address */}
+                <div className="p-3.5 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-emerald-600" />
+                      <span>Store Address</span>
+                    </span>
+                    <p className="font-semibold text-slate-800 break-words line-clamp-3" title={user.shopDetails?.address}>
+                      {user.shopDetails?.address || 'Address not configured'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-emerald-600 shrink-0" />
+                    <span>Pickup Location</span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -599,8 +831,8 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
+              <div className="flex flex-row flex-nowrap items-stretch gap-3 overflow-x-auto scrollbar-none pb-1 sm:grid sm:grid-cols-3 sm:overflow-visible">
+                <div className="min-w-[180px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                     Shop Name <span className="text-red-500">*</span>
                   </label>
@@ -614,7 +846,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="min-w-[180px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                     Store Category
                   </label>
@@ -627,7 +859,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="min-w-[200px] sm:min-w-0 space-y-1 shrink-0 sm:shrink">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                     Store Address / Location
                   </label>
@@ -1149,6 +1381,23 @@ export default function ProfilePage() {
         onClose={() => setIsTrackModalOpen(false)}
         orderId={selectedOrderToTrack}
       />
+
+      {/* Storefront Full Image Preview Modal (like ProductImageModal) */}
+      {role === 'shop_owner' && user?.shopDetails && (
+        <ShopImageModal
+          shop={{
+            name: user.shopDetails.shopName || shopName || 'My Store',
+            image: user.shopDetails.image || shopImage,
+            category: user.shopDetails.category || shopCategory,
+            address: user.shopDetails.address || shopAddress,
+            isOpen: true,
+          }}
+          isOpen={isShopImageModalOpen}
+          onClose={() => setIsShopImageModalOpen(false)}
+          isOwner={true}
+          onEditImage={handleStartEditShop}
+        />
+      )}
     </div>
   );
 }

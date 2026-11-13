@@ -2,11 +2,15 @@ import mongoose from 'mongoose';
 import dns from 'dns';
 
 // Fix querySrv ECONNREFUSED on Windows networks for mongodb+srv://
-try {
-  dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
-} catch {
-  // Ignore in environments where setting DNS servers is not allowed
+function setPublicDNS() {
+  try {
+    dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+  } catch {
+    // Ignore in environments where setting DNS servers is not allowed
+  }
 }
+
+setPublicDNS();
 
 const MONGODB_URI =
   process.env.MONGODB_URI ||
@@ -28,18 +32,34 @@ if (!global.mongooseCache) {
   global.mongooseCache = cached;
 }
 
+async function attemptConnect(retries = 3): Promise<typeof mongoose> {
+  setPublicDNS();
+  const opts: mongoose.ConnectOptions = {
+    bufferCommands: false,
+    serverSelectionTimeoutMS: 8000,
+  };
+
+  try {
+    return await mongoose.connect(MONGODB_URI, opts);
+  } catch (err: any) {
+    if (retries > 1 && (err.code === 'ECONNREFUSED' || err.message?.includes('querySrv'))) {
+      try {
+        dns.setServers(['1.1.1.1', '8.8.8.8']);
+      } catch {}
+      await new Promise((res) => setTimeout(res, 400));
+      return attemptConnect(retries - 1);
+    }
+    throw err;
+  }
+}
+
 export async function connectDB(): Promise<typeof mongoose> {
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    const opts: mongoose.ConnectOptions = {
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 10000,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongooseInstance) => {
+    cached.promise = attemptConnect(3).then((mongooseInstance) => {
       return mongooseInstance;
     });
   }
@@ -53,4 +73,3 @@ export async function connectDB(): Promise<typeof mongoose> {
 
   return cached.conn;
 }
-

@@ -139,6 +139,8 @@ export default function CartPage() {
             image: it.image,
             unit: it.unit,
             category: it.category,
+            shopId: it.shopId,
+            shopName: it.shopName,
           })),
           addressId: selectedAddress._id.startsWith('guest_') ? undefined : selectedAddress._id,
           deliveryAddress: addressSnapshot,
@@ -157,6 +159,11 @@ export default function CartPage() {
         deliveryAddress: addressSnapshot,
         totalAmount,
       });
+
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('qb_latest_order', JSON.stringify(orderData || {}));
+        window.dispatchEvent(new Event('qb_order_placed'));
+      }
 
       setOrderPlaced(true);
       clearCart();

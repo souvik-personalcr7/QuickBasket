@@ -14,10 +14,12 @@ import {
   Sparkles,
   ShoppingBag,
   CheckCircle,
+  Eye,
 } from 'lucide-react';
 import { Shop, Product } from '@/data/mockData';
 import { ProductCard } from './ProductCard';
 import { getStoredShopImage } from '@/lib/imageUtils';
+import { ShopImageModal } from './ShopImageModal';
 
 interface ShopProductsModalProps {
   shop: Shop | null;
@@ -36,6 +38,7 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isShopImageModalOpen, setIsShopImageModalOpen] = useState(false);
 
   // Lock background scroll when popup is open
   useEffect(() => {
@@ -104,12 +107,19 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
         <div className="relative bg-gradient-to-r from-emerald-800 via-emerald-700 to-green-800 text-white p-5 sm:p-6 shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 shrink-0 shadow-md">
+              <div
+                onClick={() => setIsShopImageModalOpen(true)}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-white/10 border-2 border-white/20 shrink-0 shadow-md cursor-pointer relative group/thumb"
+                title="Click to view storefront photo"
+              >
                 <img
                   src={activeShopImage}
                   alt={shop.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                 />
+                <div className="absolute inset-0 bg-slate-950/30 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-[1px]">
+                  <Eye className="w-4 h-4 drop-shadow-sm" />
+                </div>
               </div>
 
               <div className="min-w-0">
@@ -154,10 +164,22 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
                   )}
 
                   <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1 bg-emerald-900/60 text-emerald-200 px-2.5 py-0.5 rounded-lg font-bold text-[11px]">
-                    <Package className="w-3 h-3 shrink-0" />
+                    <Package className="w-3.5 h-3.5 shrink-0" />
                     <span>{products.length}</span>
                     <span>{products.length === 1 ? 'item' : 'items'}</span>
                   </span>
+
+                  {shop.isOpen === false ? (
+                    <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 bg-red-600/90 text-white px-2.5 py-0.5 rounded-lg font-bold text-[11px] shadow-xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                      <span>Closed</span>
+                    </span>
+                  ) : (
+                    <span className="whitespace-nowrap shrink-0 inline-flex items-center gap-1.5 bg-emerald-500/50 text-white px-2.5 py-0.5 rounded-lg font-bold text-[11px] border border-emerald-400/40">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                      <span>Open Now</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -303,6 +325,24 @@ export const ShopProductsModal: React.FC<ShopProductsModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Large Storefront Image Preview Modal */}
+      <ShopImageModal
+        shop={{
+          name: shop.name,
+          image: activeShopImage,
+          category: shop.category,
+          address: shop.address,
+          rating: shop.rating,
+          reviewCount: shop.reviewCount,
+          deliveryTime: shop.deliveryTime,
+          isOpen: shop.isOpen,
+          isFreeDelivery: shop.isFreeDelivery,
+          productCount: products.length,
+        }}
+        isOpen={isShopImageModalOpen}
+        onClose={() => setIsShopImageModalOpen(false)}
+      />
     </div>
   );
 };

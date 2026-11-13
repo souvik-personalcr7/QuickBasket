@@ -1,14 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
   images: {
     remotePatterns: [
       {
@@ -17,9 +9,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    agentUpgrade: 'security',
-  } as any,
 };
 
 export default nextConfig;

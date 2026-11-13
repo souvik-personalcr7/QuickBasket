@@ -77,17 +77,21 @@ function SignupForm() {
     }
   }, [searchParams]);
 
-  // If already authenticated, redirect
+  // If already authenticated, only auto-redirect if an explicit protected redirect was requested
   useEffect(() => {
     if (isAuthenticated && currentRole) {
       const redirectParam = searchParams.get('redirect');
-      if (redirectParam && redirectParam.startsWith('/')) {
+      if (
+        redirectParam &&
+        redirectParam.startsWith('/') &&
+        redirectParam !== '/' &&
+        redirectParam !== '/login' &&
+        redirectParam !== '/signup'
+      ) {
         router.push(redirectParam);
-      } else {
-        router.push(getRoleRedirectPath(currentRole));
       }
     }
-  }, [isAuthenticated, currentRole, router, getRoleRedirectPath, searchParams]);
+  }, [isAuthenticated, currentRole, router, searchParams]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,

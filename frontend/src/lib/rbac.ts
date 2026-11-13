@@ -156,13 +156,9 @@ export function evaluateRouteAccess(
   }
 
   // 3. Authenticated Users on Auth Pages (/login, /signup)
+  // Always allow users to navigate to auth pages so they can switch accounts or register
   if (isAuthPageRoute(normPath)) {
-    const defaultDashboard = ROLE_DASHBOARDS[session.role] || '/';
-    return {
-      action: 'redirect',
-      targetUrl: defaultDashboard,
-      reason: 'Authenticated users are redirected away from auth pages',
-    };
+    return { action: 'allow' };
   }
 
   // 4. Role-Specific Access Rules

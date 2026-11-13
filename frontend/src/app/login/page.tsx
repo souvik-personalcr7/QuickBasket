@@ -48,24 +48,24 @@ function LoginForm() {
     }
   }, [searchParams]);
 
-  // If already logged in, redirect to destination safely
+  // If already logged in, only auto-redirect if an explicit protected redirect was requested
   useEffect(() => {
     if (isAuthenticated && currentRole) {
       const redirectParam = searchParams.get('redirect');
-      if (redirectParam && redirectParam.startsWith('/')) {
-        if (redirectParam === '/' && currentRole !== 'customer') {
-          router.replace(getRoleRedirectPath(currentRole));
-          return;
-        }
+      if (
+        redirectParam &&
+        redirectParam.startsWith('/') &&
+        redirectParam !== '/' &&
+        redirectParam !== '/login' &&
+        redirectParam !== '/signup'
+      ) {
         const evalRes = evaluateRouteAccess(redirectParam, { id: '', role: currentRole, email: '' });
         if (evalRes.action === 'allow') {
           router.replace(redirectParam);
-          return;
         }
       }
-      router.replace(getRoleRedirectPath(currentRole));
     }
-  }, [isAuthenticated, currentRole, router, getRoleRedirectPath, searchParams]);
+  }, [isAuthenticated, currentRole, router, searchParams]);
 
   // Quick Demo fill credentials
   const fillDemoCredentials = (role: UserRole) => {

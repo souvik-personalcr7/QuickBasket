@@ -13,6 +13,7 @@ export interface ShopDetails {
   address?: string;
   image?: string;
   isApproved?: boolean;
+  isOpen?: boolean;
 }
 
 export interface DeliveryDetails {

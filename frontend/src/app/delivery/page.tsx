@@ -106,16 +106,51 @@ export default function DeliveryPartnerDashboard() {
     if (typeof window === 'undefined') return;
     try {
       const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+
+      // 1. Check if rider has explicitly saved duty state on this device
+      let localChoice: boolean | null = null;
       if (riderId) {
         const specific = localStorage.getItem(`qb_rider_online_duty_${riderId}`);
         if (specific !== null) {
-          setIsOnDutyState(specific === 'true');
-          return;
+          localChoice = specific === 'true';
         }
       }
-      const gen = localStorage.getItem('qb_rider_online_duty');
-      if (gen !== null) {
-        setIsOnDutyState(gen === 'true');
+      if (localChoice === null) {
+        const gen = localStorage.getItem('qb_rider_online_duty');
+        if (gen !== null) {
+          localChoice = gen === 'true';
+        }
+      }
+
+      // If the rider already set their duty status physically, PRESERVE THAT CHOICE!
+      if (localChoice !== null) {
+        setIsOnDutyState(localChoice);
+        // If DB has a different value, sync the rider's physical choice to the DB
+        if (user && user.deliveryDetails?.isAvailable !== localChoice) {
+          user.deliveryDetails = {
+            ...(user.deliveryDetails || {}),
+            isAvailable: localChoice,
+          };
+          const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          fetch('/api/delivery/duty-status', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ isAvailable: localChoice, userId: user?.id }),
+          }).catch(() => {});
+        }
+        return;
+      }
+
+      // If no local setting was ever saved, use remote profile from DB if available
+      if (user?.deliveryDetails?.isAvailable !== undefined) {
+        setIsOnDutyState(user.deliveryDetails.isAvailable);
+        localStorage.setItem('qb_rider_online_duty', String(user.deliveryDetails.isAvailable));
+        if (riderId) {
+          localStorage.setItem(`qb_rider_online_duty_${riderId}`, String(user.deliveryDetails.isAvailable));
+        }
       }
     } catch {
       // Ignored
@@ -125,31 +160,67 @@ export default function DeliveryPartnerDashboard() {
   // Persistent toggle: saves state so it remains OFF through reloads until rider turns it back ON
   const setIsOnDuty = useCallback(
     (newDuty: boolean | ((prev: boolean) => boolean)) => {
-      setIsOnDutyState((prev) => {
-        const next = typeof newDuty === 'function' ? newDuty(prev) : newDuty;
-        if (typeof window !== 'undefined') {
-          try {
-            // Save to both universal key and user-scoped key
-            localStorage.setItem('qb_rider_online_duty', String(next));
-            const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
-            if (riderId) {
-              localStorage.setItem(`qb_rider_online_duty_${riderId}`, String(next));
-            }
-          } catch (e) {
-            console.warn('Failed to save rider duty status to localStorage', e);
-          }
-        }
-        return next;
-      });
+      // Calculate target status synchronously without relying on React deferred state updater
+      const next = typeof newDuty === 'function' ? newDuty(isOnDuty) : newDuty;
 
-      // Dispatch event outside state updater
+      // 1. Immediately update React state
+      setIsOnDutyState(next);
+
+      // 2. Immediately write to localStorage
       if (typeof window !== 'undefined') {
-        queueMicrotask(() => {
-          window.dispatchEvent(new Event('qb:rider_duty_updated'));
-        });
+        try {
+          // Save to both universal key and user-scoped key
+          localStorage.setItem('qb_rider_online_duty', String(next));
+          const riderId = user?.id || (user as any)?._id || (user?.email ? user.email.toLowerCase().trim() : null);
+          if (riderId) {
+            localStorage.setItem(`qb_rider_online_duty_${riderId}`, String(next));
+          }
+        } catch (e) {
+          console.warn('Failed to save rider duty status to localStorage', e);
+        }
       }
+
+      // 3. Update in-memory user object so /auth/me doesn't overwrite it
+      if (user) {
+        if (!user.deliveryDetails) {
+          user.deliveryDetails = { isAvailable: next };
+        } else {
+          user.deliveryDetails.isAvailable = next;
+        }
+      }
+
+      // 4. Dispatch event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('qb:rider_duty_updated'));
+      }
+
+      // 5. Sync duty status to both backend Express and Next.js serverless API
+      (async () => {
+        try {
+          await apiClient('/delivery/duty-status', {
+            method: 'PATCH',
+            body: JSON.stringify({ isAvailable: next }),
+          });
+        } catch {
+          // Express API may not be running in serverless-only mode; try serverless endpoint
+        }
+
+        try {
+          const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+          await fetch('/api/delivery/duty-status', {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ isAvailable: next, userId: user?.id }),
+          });
+        } catch (err) {
+          console.warn('Failed to sync duty status to Next.js API:', err);
+        }
+      })();
     },
-    [user]
+    [user, isOnDuty]
   );
 
   // Synchronize cross-tab and storage events
@@ -820,15 +891,29 @@ export default function DeliveryPartnerDashboard() {
                     <button
                       type="button"
                       disabled={actionLoadingId === activeOrder._id}
+                      onClick={() => handleUpdateStatus(activeOrder._id, 'PICKED_UP')}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 sm:px-6 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
+                    >
+                      {actionLoadingId === activeOrder._id ? (
+                        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                      ) : (
+                        <PackageCheck className="w-4 h-4 shrink-0" />
+                      )}
+                      <span className="whitespace-nowrap">Order Picked (Confirm Pickup from Store)</span>
+                    </button>
+                  ) : activeOrder.status === 'PICKED_UP' ? (
+                    <button
+                      type="button"
+                      disabled={actionLoadingId === activeOrder._id}
                       onClick={() => handleUpdateStatus(activeOrder._id, 'OUT_FOR_DELIVERY')}
                       className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 sm:px-6 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs shadow-md transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap shrink-0"
                     >
                       {actionLoadingId === activeOrder._id ? (
                         <Loader2 className="w-4 h-4 animate-spin shrink-0" />
                       ) : (
-                        <Check className="w-4 h-4 shrink-0" />
+                        <Navigation className="w-4 h-4 shrink-0" />
                       )}
-                      <span className="whitespace-nowrap">Confirm Picked Up &amp; Start Doorstep Delivery (Out for Delivery)</span>
+                      <span className="whitespace-nowrap">Start Doorstep Delivery (Out for Delivery)</span>
                     </button>
                   ) : (
                     <button

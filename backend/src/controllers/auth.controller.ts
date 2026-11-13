@@ -278,6 +278,7 @@ export const updateShopDetails = async (
       address: parsed.data.address !== undefined ? parsed.data.address.trim() : (current.address || ''),
       image: parsed.data.image !== undefined ? parsed.data.image.trim() : (current.image || ''),
       isApproved: true,
+      isOpen: parsed.data.isOpen !== undefined ? parsed.data.isOpen : (current.isOpen !== undefined ? current.isOpen : true),
     };
 
     await user.save();

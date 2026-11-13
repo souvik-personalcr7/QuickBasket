@@ -463,10 +463,20 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-800 border border-red-200">
                   CANCELLED
                 </span>
-              ) : isOutForDelivery ? (
+              ) : order?.status === 'OUT_FOR_DELIVERY' ? (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 animate-pulse">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-ping" />
                   OUT FOR DELIVERY
+                </span>
+              ) : order?.status === 'PICKED_UP' ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-ping" />
+                  ORDER PICKED UP
+                </span>
+              ) : order?.status === 'RIDER_ACCEPTED' || order?.status === 'RIDER_ASSIGNED' ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 animate-ping" />
+                  DELIVERY PARTNER ASSIGNED
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-900 border border-blue-200">
@@ -478,8 +488,12 @@ export const LiveOrderTracker: React.FC<LiveOrderTrackerProps> = ({
             <h2 className="text-base sm:text-lg font-black text-slate-900">
               {isDelivered
                 ? 'Delivered to your Doorstep!'
-                : isOutForDelivery
+                : order?.status === 'OUT_FOR_DELIVERY'
                 ? 'Out for Delivery — Your Groceries are On the Way!'
+                : order?.status === 'PICKED_UP'
+                ? 'Order Picked Up — Rider is En Route to Your Address!'
+                : order?.status === 'RIDER_ACCEPTED' || order?.status === 'RIDER_ASSIGNED'
+                ? 'Delivery Partner Assigned — Heading to Store to Pick Order'
                 : 'Store is Preparing Your Order'}
             </h2>
             {isDelivered && (

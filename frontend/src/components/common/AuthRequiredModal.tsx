@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Heart, LogIn, UserPlus, X, Sparkles, ShieldCheck } from 'lucide-react';
 
 interface AuthRequiredModalProps {
@@ -18,7 +18,13 @@ export const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
   title = 'Sign In to Save Favorites',
   description = 'Please log in or create an account to save your favorite groceries, sync your wishlist across all devices, and reorder quickly.',
 }) => {
+  const router = useRouter();
   const pathname = usePathname() || '/';
+
+  const handleNavigate = (path: string) => {
+    onClose();
+    router.push(path);
+  };
 
   // Handle ESC key and scroll locking
   useEffect(() => {
@@ -105,24 +111,24 @@ export const AuthRequiredModal: React.FC<AuthRequiredModalProps> = ({
         {/* Primary Action Buttons */}
         <div className="space-y-2.5">
           {/* Log In Button */}
-          <Link
-            href={`/login?redirect=${redirectUrl}`}
-            onClick={onClose}
+          <button
+            type="button"
+            onClick={() => handleNavigate(`/login?redirect=${redirectUrl}`)}
             className="w-full py-3 px-4 rounded-xl font-bold text-white bg-[#135d38] hover:bg-[#0f4e2e] shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer active:scale-[0.99]"
           >
             <LogIn className="w-4 h-4" />
             <span>Log In</span>
-          </Link>
+          </button>
 
           {/* Sign Up Button */}
-          <Link
-            href={`/signup?redirect=${redirectUrl}`}
-            onClick={onClose}
+          <button
+            type="button"
+            onClick={() => handleNavigate(`/signup?redirect=${redirectUrl}`)}
             className="w-full py-3 px-4 rounded-xl font-bold text-[#135d38] bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 transition-all flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer active:scale-[0.99]"
           >
             <UserPlus className="w-4 h-4" />
             <span>Sign Up (Create Account)</span>
-          </Link>
+          </button>
         </div>
 
         {/* Secondary Dismiss Button */}

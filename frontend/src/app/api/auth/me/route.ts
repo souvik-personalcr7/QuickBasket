@@ -7,19 +7,24 @@ export async function GET(req: NextRequest) {
   try {
     const payload = getUserFromRequest(req);
     if (!payload || !payload.id) {
-      return NextResponse.json(
-        { success: false, message: 'Not authenticated' },
-        { status: 401 }
-      );
+      return NextResponse.json({
+        success: false,
+        message: 'Not authenticated',
+        data: null,
+      });
     }
 
     await connectDB();
     const user = await User.findById(payload.id);
     if (!user) {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { status: 404 }
-      );
+      // Clear stale token cookie if user was removed or not in cloud DB
+      const response = NextResponse.json({
+        success: false,
+        message: 'Session not found in database',
+        data: null,
+      });
+      response.cookies.delete('token');
+      return response;
     }
 
     return NextResponse.json({
@@ -30,10 +35,10 @@ export async function GET(req: NextRequest) {
     });
   } catch (error: any) {
     console.error('API /auth/me GET error:', error);
-    return NextResponse.json(
-      { success: false, message: error.message || 'Authentication check failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: false,
+      message: error.message || 'Authentication check failed',
+      data: null,
+    });
   }
 }
-

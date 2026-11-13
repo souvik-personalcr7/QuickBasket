@@ -85,9 +85,8 @@ export const acceptDeliveryOrder = async (
     }
 
     order.deliveryPartner = userId as any;
-    order.status = 'OUT_FOR_DELIVERY';
+    order.status = 'RIDER_ACCEPTED';
     order.riderAcceptedAt = new Date();
-    order.pickedUpAt = new Date();
 
     if (typeof latitude === 'number' && typeof longitude === 'number') {
       order.riderLocation = {
@@ -109,9 +108,9 @@ export const acceptDeliveryOrder = async (
       vehicleNumber: req.user?.deliveryDetails?.vehicleNumber || '',
     });
 
-    emitOrderStatusUpdate(order._id.toString(), 'OUT_FOR_DELIVERY', {
+    emitOrderStatusUpdate(order._id.toString(), 'RIDER_ACCEPTED', {
       orderId: order._id,
-      status: 'OUT_FOR_DELIVERY',
+      status: 'RIDER_ACCEPTED',
       riderLocation: order.riderLocation,
       deliveryPartner: {
         name: req.user?.name,
@@ -276,4 +275,55 @@ export const updateRiderGpsLocation = async (
     next(error);
   }
 };
+
+/**
+ * Toggles or updates rider duty / availability status (isAvailable)
+ */
+export const updateRiderDutyStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      throw new AppError('Unauthorized', 401);
+    }
+
+    if (req.user?.role !== 'delivery_partner' && req.user?.role !== 'admin') {
+      throw new AppError('Only delivery partners can update duty status.', 403);
+    }
+
+    const { isAvailable } = req.body;
+    if (typeof isAvailable !== 'boolean') {
+      throw new AppError('isAvailable must be a boolean', 400);
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+
+    const currentDetails = user.deliveryDetails || {};
+    user.deliveryDetails = {
+      ...currentDetails,
+      isAvailable,
+    };
+
+    await user.save();
+    user.password = undefined;
+
+    sendResponse(res, {
+      statusCode: 200,
+      message: `Rider is now ${isAvailable ? 'ONLINE' : 'OFFLINE'}`,
+      data: {
+        isAvailable,
+        user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 

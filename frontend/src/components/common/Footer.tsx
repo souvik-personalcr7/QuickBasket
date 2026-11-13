@@ -173,13 +173,13 @@ export const Footer: React.FC = () => {
 
             {/* Bottom Bar */}
             <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-emerald-300/60 gap-3">
-              <p>&copy; 2026 QuickBasket Merchant Portal. Empowering neighborhood commerce.</p>
-              <div className="flex flex-wrap items-center gap-3 sm:gap-6">
-                <span>Real-time Stock Sync</span>
-                <span>&bull;</span>
-                <span>Fast Daily Settlements</span>
-                <span>&bull;</span>
-                <span>Verified Store Network</span>
+              <p className="text-center sm:text-left">&copy; 2026 QuickBasket Merchant Portal. Empowering neighborhood commerce.</p>
+              <div className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-2.5 sm:gap-4 md:gap-6 text-[10px] sm:text-[11px]">
+                <span className="whitespace-nowrap shrink-0">Real-time Stock Sync</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">Fast Daily Settlements</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">Verified Stores</span>
               </div>
             </div>
           </div>
@@ -298,13 +298,13 @@ export const Footer: React.FC = () => {
 
             {/* Bottom Bar */}
             <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-emerald-300/60 gap-3">
-              <p>&copy; 2026 QuickBasket Rider Network. All rights reserved.</p>
-              <div className="flex flex-wrap items-center gap-3 sm:gap-6">
-                <span>Fast Hyperlocal Dispatch</span>
-                <span>&bull;</span>
-                <span>Safety First</span>
-                <span>&bull;</span>
-                <span>Daily Rider Settlements</span>
+              <p className="text-center sm:text-left">&copy; 2026 QuickBasket Rider Network. All rights reserved.</p>
+              <div className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-2.5 sm:gap-4 md:gap-6 text-[10px] sm:text-[11px]">
+                <span className="whitespace-nowrap shrink-0">Fast Hyperlocal Dispatch</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">Safety First</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">Daily Settlements</span>
               </div>
             </div>
           </div>
@@ -422,13 +422,13 @@ export const Footer: React.FC = () => {
 
             {/* Bottom Bar */}
             <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-[11px] text-emerald-300/60 gap-3">
-              <p>&copy; 2026 QuickBasket. All rights reserved.</p>
-              <div className="flex items-center gap-6">
-                <span>Fast Delivery</span>
-                <span>&bull;</span>
-                <span>100% Quality Guaranteed</span>
-                <span>&bull;</span>
-                <span>Secure Payments</span>
+              <p className="text-center sm:text-left">&copy; 2026 QuickBasket. All rights reserved.</p>
+              <div className="flex items-center justify-center flex-nowrap whitespace-nowrap gap-2.5 sm:gap-4 md:gap-6 text-[10px] sm:text-[11px]">
+                <span className="whitespace-nowrap shrink-0">Fast Delivery</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">100% Quality</span>
+                <span className="text-emerald-500/60 shrink-0 select-none">&bull;</span>
+                <span className="whitespace-nowrap shrink-0">Secure Payments</span>
               </div>
             </div>
           </div>

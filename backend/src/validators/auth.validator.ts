@@ -50,6 +50,7 @@ export const updateShopDetailsSchema = z.object({
   category: z.string().optional(),
   address: z.string().optional(),
   image: z.string().optional(),
+  isOpen: z.boolean().optional(),
 });
 
 export const updateProfileSchema = z.object({

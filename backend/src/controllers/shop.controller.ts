@@ -38,7 +38,7 @@ export const getShops = async (
           isFreeDelivery: true,
           ownerId: owner._id.toString(),
           ownerEmail: owner.email,
-          isOpen: true,
+          isOpen: owner.shopDetails?.isOpen !== undefined ? owner.shopDetails.isOpen : true,
           productCount,
         };
       })
@@ -94,7 +94,7 @@ export const getShopById = async (
       isFreeDelivery: true,
       ownerId: owner._id.toString(),
       ownerEmail: owner.email,
-      isOpen: true,
+      isOpen: owner.shopDetails?.isOpen !== undefined ? owner.shopDetails.isOpen : true,
       productCount: products.length,
       products,
     };

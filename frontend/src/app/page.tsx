@@ -157,12 +157,17 @@ export default function CustomerHomePage() {
 
       // 3. Gather all registered shops (from backend + localStorage)
       const shopMap = new Map<string, Shop>();
+      const seenShopIds = new Set<string>();
 
       // First add backend shops (from MongoDB)
       for (const s of apiShops) {
         if (!s || !s.id) continue;
         const normKey = (s.name || s.id).trim().toLowerCase();
-        shopMap.set(normKey, s);
+        const idKey = s.id.trim().toLowerCase();
+        if (!seenShopIds.has(idKey)) {
+          seenShopIds.add(idKey);
+          shopMap.set(normKey, s);
+        }
       }
 
       // Merge local registered shops
@@ -173,26 +178,26 @@ export default function CustomerHomePage() {
             const parsedShops = JSON.parse(rawShops);
             if (Array.isArray(parsedShops)) {
               for (const s of parsedShops) {
-                if (!s) continue;
+                if (!s || !s.id) continue;
                 const normKey = (s.name || s.id || '').trim().toLowerCase();
-                if (!normKey) continue;
-                if (!shopMap.has(normKey)) {
-                  shopMap.set(normKey, {
-                    id: s.id,
-                    name: s.name,
-                    category: s.category || 'Retail & Grocery',
-                    rating: s.rating || 4.8,
-                    reviewCount: s.reviewCount || 'Verified Store',
-                    deliveryTime: s.deliveryTime || '20-30 mins',
-                    isFreeDelivery: s.isFreeDelivery ?? true,
-                    image: s.image,
-                    address: s.address,
-                    ownerId: s.ownerId,
-                    ownerEmail: s.ownerEmail,
-                    isOpen: s.isOpen ?? true,
-                    productCount: s.productCount,
-                  });
-                }
+                const idKey = s.id.trim().toLowerCase();
+                if (!normKey || seenShopIds.has(idKey) || shopMap.has(normKey)) continue;
+                seenShopIds.add(idKey);
+                shopMap.set(normKey, {
+                  id: s.id,
+                  name: s.name,
+                  category: s.category || 'Retail & Grocery',
+                  rating: s.rating || 4.8,
+                  reviewCount: s.reviewCount || 'Verified Store',
+                  deliveryTime: s.deliveryTime || '20-30 mins',
+                  isFreeDelivery: s.isFreeDelivery ?? true,
+                  image: s.image,
+                  address: s.address,
+                  ownerId: s.ownerId,
+                  ownerEmail: s.ownerEmail,
+                  isOpen: s.isOpen ?? true,
+                  productCount: s.productCount,
+                });
               }
             }
           }
