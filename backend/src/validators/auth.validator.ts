@@ -33,7 +33,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: z.string().min(1, 'Email or phone number is required'),
   password: z.string().min(1, 'Password is required'),
   role: z.enum(['customer', 'shop_owner', 'delivery_partner', 'admin']).optional(),
 });
@@ -56,6 +56,7 @@ export const updateShopDetailsSchema = z.object({
 export const updateProfileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(100, 'Name cannot exceed 100 characters').optional(),
   phone: z.string().min(8, 'Phone number must be at least 8 digits').optional(),
+  email: z.string().email('Please enter a valid email address').optional(),
   avatar: z.string().optional(),
 });
 

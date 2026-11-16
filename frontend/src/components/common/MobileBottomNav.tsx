@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Home, Grid, ShoppingBag, Receipt, User, Bike, Store, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -26,10 +27,21 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const [mounted, setMounted] = useState(false);
   const { user, isAuthenticated, role, getRoleRedirectPath } = useAuth();
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const isSignupPage = pathname === '/signup' || (pathname ? pathname.startsWith('/signup/') : false);
+  const isLoginPage = pathname === '/login' || (pathname ? pathname.startsWith('/login/') : false);
+  const isForgotPasswordPage = pathname === '/forgot-password' || (pathname ? pathname.startsWith('/forgot-password/') : false);
+  const isAuthPage = isSignupPage || isLoginPage || isForgotPasswordPage;
+
+  // Do not show mobile bottom navigation bar on auth pages (login, signup, forgot-password)
+  if (isAuthPage) {
+    return null;
+  }
 
   const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
   const isShopOwner = mounted && isAuthenticated && role === 'shop_owner';

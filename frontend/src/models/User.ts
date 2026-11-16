@@ -1,5 +1,6 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { normalizeEmail, normalizePhoneNumber } from '@/lib/normalize';
 
 export type UserRole = 'customer' | 'shop_owner' | 'delivery_partner' | 'admin';
 
@@ -63,7 +64,10 @@ const UserSchema = new Schema<IUser>(
     phone: {
       type: String,
       required: [true, 'Phone number is required'],
+      unique: true,
+      sparse: true,
       trim: true,
+      index: true,
     },
     password: {
       type: String,
@@ -120,6 +124,16 @@ const UserSchema = new Schema<IUser>(
     },
   }
 );
+
+// Normalize email and phone before saving
+UserSchema.pre<IUser>('save', function () {
+  if (this.isModified('email') && this.email) {
+    this.email = normalizeEmail(this.email);
+  }
+  if (this.isModified('phone') && this.phone) {
+    this.phone = normalizePhoneNumber(this.phone);
+  }
+});
 
 // Hash password before saving
 UserSchema.pre<IUser>('save', async function () {

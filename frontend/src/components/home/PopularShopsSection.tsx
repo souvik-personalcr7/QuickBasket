@@ -20,22 +20,22 @@ export const PopularShopsSection: React.FC<PopularShopsSectionProps> = ({
   return (
     <section id="shops" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
       {/* Section Header - Perfectly aligned with other sections */}
-      <div className="flex items-center justify-between mb-4 sm:mb-6">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-[#0f3d23] tracking-tight">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-4">
+          <h2 className="text-lg xs:text-xl sm:text-2xl font-extrabold text-[#0f3d23] tracking-tight">
             Popular Shops Near You
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {shops.length > 0
-              ? 'Click on any store to view all products listed by that shop owner'
-              : 'Verified neighborhood store owners'}
-          </p>
+          {shops.length > 0 && (
+            <span className="text-[11px] sm:text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border border-emerald-200 whitespace-nowrap shrink-0">
+              {shops.length} Active {shops.length === 1 ? 'Store' : 'Stores'}
+            </span>
+          )}
         </div>
-        {shops.length > 0 && (
-          <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 whitespace-nowrap">
-            {shops.length} Active {shops.length === 1 ? 'Store' : 'Stores'}
-          </span>
-        )}
+        <p className="text-xs text-slate-500 mt-0.5 sm:mt-1">
+          {shops.length > 0
+            ? 'Click on any store to view all products listed by that shop owner'
+            : 'Verified neighborhood store owners'}
+        </p>
       </div>
 
       {/* Grid of Real Shops OR Empty State */}

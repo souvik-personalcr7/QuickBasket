@@ -118,6 +118,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const isSignupPage = pathname === '/signup' || (pathname ? pathname.startsWith('/signup/') : false);
   const isLoginPage = pathname === '/login' || (pathname ? pathname.startsWith('/login/') : false);
   const isForgotPasswordPage = pathname === '/forgot-password' || (pathname ? pathname.startsWith('/forgot-password/') : false);
+  const isAuthPage = isSignupPage || isLoginPage || isForgotPasswordPage;
   const isHomePage = pathname === '/';
 
   const isDeliveryPartner = mounted && isAuthenticated && role === 'delivery_partner';
@@ -126,7 +127,7 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
   const isUserLoggedIn = mounted && isAuthenticated;
 
   // Left side drawer is disabled on the login page, sign up page, forgot password page, OR on the home page when the user is not logged in
-  const isDrawerDisabled = isLoginPage || isSignupPage || isForgotPasswordPage || (isHomePage && !isUserLoggedIn);
+  const isDrawerDisabled = isAuthPage || (isHomePage && !isUserLoggedIn);
 
   // Auto-close left side drawer when it becomes disabled
   useEffect(() => {
@@ -154,7 +155,10 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   aria-label="Open side drawer"
                   title="Open menu"
                 >
-                  {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+                  <div className="relative w-6 h-6 flex items-center justify-center">
+                    <Menu className={`w-6 h-6 transition-all duration-200 ${mobileMenuOpen ? 'opacity-0 scale-75 rotate-90' : 'opacity-100 scale-100 rotate-0'}`} />
+                    <X className={`w-6 h-6 absolute transition-all duration-200 ${mobileMenuOpen ? 'opacity-100 scale-100 rotate-0' : 'opacity-0 scale-75 -rotate-90'}`} />
+                  </div>
                 </button>
               </div>
             )}
@@ -255,6 +259,9 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                   <span>Store Details</span>
                 </Link>
               </nav>
+            ) : isAuthPage ? (
+              /* Hide customer navigation links on Sign Up and Login pages */
+              null
             ) : (
               <nav className="hidden md:flex items-center gap-8">
                 {navLinks.map((link) => {
@@ -304,8 +311,8 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
 
             {/* Right Action Area */}
             <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {/* Only show Cart if NOT a Delivery Partner AND NOT a Shop Owner */}
-              {!isStaffPortal && (
+              {/* Only show Cart if NOT a Delivery Partner, NOT a Shop Owner, AND NOT on Auth Pages */}
+              {!isStaffPortal && !isAuthPage && (
                 <Link
                   href="/cart"
                   className="relative p-2 text-slate-700 hover:text-[#15803d] hover:bg-emerald-50 rounded-full transition-colors"
@@ -444,6 +451,40 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                     </div>
                   )}
                 </div>
+              ) : isAuthPage ? (
+                /* Sleek auth toggle on Sign Up and Login pages */
+                <div className="flex items-center gap-2">
+                  {isSignupPage && (
+                    <>
+                      <span className="hidden sm:inline text-xs text-slate-500 font-medium">Already have an account?</span>
+                      <Link
+                        href="/login"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0f5132] hover:bg-[#166534] rounded-full shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#15803d]"
+                      >
+                        Log In
+                      </Link>
+                    </>
+                  )}
+                  {isLoginPage && (
+                    <>
+                      <span className="hidden sm:inline text-xs text-slate-500 font-medium">New to QuickBasket?</span>
+                      <Link
+                        href="/signup"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0f5132] hover:bg-[#166534] rounded-full shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#15803d]"
+                      >
+                        Sign Up
+                      </Link>
+                    </>
+                  )}
+                  {isForgotPasswordPage && (
+                    <Link
+                      href="/login"
+                      className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-semibold text-white bg-[#0f5132] hover:bg-[#166534] rounded-full shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-[#15803d]"
+                    >
+                      Back to Login
+                    </Link>
+                  )}
+                </div>
               ) : (
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   {/* Mobile User Icon (Always visible on mobile when logged out) */}
@@ -474,17 +515,28 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
       </header>
 
       {/* Slide-Out Left Drawer (Accessible on Mobile only; hidden in Desktop view, hidden on Sign Up page, and hidden on Home page when user is not logged in) */}
-      {mobileMenuOpen && !isDrawerDisabled && (
+      {!isDrawerDisabled && (
         <div
-          className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity md:hidden"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) {
-              setMobileMenuOpen(false);
-            }
-          }}
+          className={`fixed inset-0 z-[60] md:hidden transition-all duration-300 ease-in-out ${
+            mobileMenuOpen
+              ? 'opacity-100 pointer-events-auto visible'
+              : 'opacity-0 pointer-events-none invisible'
+          }`}
+          aria-hidden={!mobileMenuOpen}
         >
+          {/* Backdrop with smooth blur and fade */}
           <div
-            className="fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200 md:hidden"
+            className={`absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity duration-300 ease-in-out ${
+              mobileMenuOpen ? 'opacity-100' : 'opacity-0'
+            }`}
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          {/* Drawer Panel with smooth slide from left */}
+          <div
+            className={`fixed top-0 left-0 bottom-0 w-3/4 max-w-xs bg-white p-6 shadow-2xl flex flex-col justify-between overflow-y-auto z-10 transition-transform duration-300 ease-out transform will-change-transform ${
+              mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
             <div>
@@ -500,7 +552,8 @@ export const Header: React.FC<HeaderProps> = ({ cartCount = 0 }) => {
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-800"
+                  className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Close side drawer"
                 >
                   <X className="w-5 h-5" />
                 </button>

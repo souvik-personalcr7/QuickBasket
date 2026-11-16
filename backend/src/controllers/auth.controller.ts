@@ -16,6 +16,7 @@ import { AppError } from '../utils/appError';
 import { sendResponse } from '../utils/apiResponse';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { sendPasswordResetOtpEmail } from '../services/email.service';
+import { normalizeEmail, normalizePhoneNumber } from '../utils/normalize';
 
 // Helper to sign JWT
 export const signToken = (user: IUser): string => {
@@ -60,17 +61,31 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
     const { name, email, phone, password, role, address, shopDetails, deliveryDetails, avatar } = parsed.data;
 
-    // 2. Check existing user
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      throw new AppError('An account with this email address already exists.', 409);
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPhone = normalizePhoneNumber(phone);
+
+    // 2. Check existing user by email (Global check across all user roles)
+    const existingEmail = await User.findOne({ email: normalizedEmail });
+    if (existingEmail) {
+      throw new AppError('This email address is already registered. Please use another email.', 409);
     }
 
-    // 3. Create user
+    // 3. Check existing user by phone (Global check across all user roles)
+    const existingPhone = await User.findOne({
+      $or: [
+        { phone: normalizedPhone },
+        { phone: phone.trim() },
+      ],
+    });
+    if (existingPhone) {
+      throw new AppError('This phone number is already registered. Please use another phone number.', 409);
+    }
+
+    // 4. Create user
     const user = new User({
-      name,
-      email: email.toLowerCase(),
-      phone,
+      name: name.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
       password,
       role: role || 'customer',
       avatar: avatar || '',
@@ -110,30 +125,32 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
     const { email, password, role } = parsed.data;
 
-    // 2. Find user with password included
-    const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+    const rawIdentifier = email.trim();
+    const cleanEmail = normalizeEmail(rawIdentifier);
+    const cleanPhone = normalizePhoneNumber(rawIdentifier);
+
+    // 2. Find user by email OR phone number (with password included)
+    const user = await User.findOne({
+      $or: [
+        { email: cleanEmail },
+        ...(cleanPhone ? [{ phone: cleanPhone }] : []),
+        { phone: rawIdentifier },
+      ],
+    }).select('+password');
+
     if (!user) {
-      throw new AppError('Invalid email or password.', 401);
+      throw new AppError('Invalid email/phone number or password.', 401);
     }
 
     // 3. Verify password
     const isPasswordCorrect = await user.comparePassword(password);
     if (!isPasswordCorrect) {
-      throw new AppError('Invalid email or password.', 401);
+      throw new AppError('Invalid email/phone number or password.', 401);
     }
 
-    // 4. Optional role check for portal mismatch warnings
-    if (role && user.role !== role) {
-      const friendlyRoleNames: Record<string, string> = {
-        customer: 'Customer',
-        shop_owner: 'Shop Owner',
-        delivery_partner: 'Delivery Partner',
-        admin: 'Administrator',
-      };
-      throw new AppError(
-        `This account is registered as a ${friendlyRoleNames[user.role] || user.role}. Please select the ${friendlyRoleNames[user.role]} role tab to log in.`,
-        403
-      );
+    // 4. Role check for portal mismatch warnings
+    if (role && user.role !== role && user.role !== 'admin') {
+      throw new AppError('Already Used', 403);
     }
 
     if (!user.isActive) {
@@ -316,7 +333,7 @@ export const updateProfile = async (
       throw new AppError(errorMsg, 400);
     }
 
-    const { name, phone, avatar } = parsed.data;
+    const { name, phone, email, avatar } = parsed.data;
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -324,8 +341,31 @@ export const updateProfile = async (
     }
 
     if (name !== undefined) user.name = name.trim();
-    if (phone !== undefined) user.phone = phone.trim();
     if (avatar !== undefined) user.avatar = avatar.trim();
+
+    if (phone !== undefined) {
+      const normalizedPhone = normalizePhoneNumber(phone);
+      const existingPhone = await User.findOne({
+        phone: normalizedPhone,
+        _id: { $ne: user._id },
+      });
+      if (existingPhone) {
+        throw new AppError('This phone number is already registered. Please use another phone number.', 409);
+      }
+      user.phone = normalizedPhone;
+    }
+
+    if (email !== undefined) {
+      const normalizedEmail = normalizeEmail(email);
+      const existingEmail = await User.findOne({
+        email: normalizedEmail,
+        _id: { $ne: user._id },
+      });
+      if (existingEmail) {
+        throw new AppError('This email address is already registered. Please use another email.', 409);
+      }
+      user.email = normalizedEmail;
+    }
 
     await user.save();
     user.password = undefined;
