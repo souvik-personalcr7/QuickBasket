@@ -6,6 +6,7 @@ import { Heart, ShoppingBag, Check, IndianRupee, Eye } from 'lucide-react';
 import { Product } from '@/data/mockData';
 import { useFavorites } from '@/context/FavoritesContext';
 import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 import { ProductImageModal } from './ProductImageModal';
 
 interface ProductCardProps {
@@ -16,7 +17,8 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }) => {
   const router = useRouter();
   const { isFavorite: checkFavorite, toggleFavorite } = useFavorites();
-  const { addToCart } = useCart();
+  const { addToCart, openAuthModal } = useCart();
+  const { isAuthenticated } = useAuth();
   const productId = product?.id || (product as any)?._id || '';
   const isFavorite = checkFavorite(productId);
   const [isAdded, setIsAdded] = useState(false);
@@ -30,6 +32,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
       e.stopPropagation();
     }
     if (isOutOfStock) return;
+
+    // If customer is not logged in, show auth popup before they can shop
+    if (!isAuthenticated) {
+      openAuthModal();
+      return;
+    }
+
     setIsAdded(true);
     if (onAddToCart) {
       onAddToCart(product);
@@ -109,10 +118,21 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onAddToCart }
         </div>
 
         {/* Bellow of Product Image: Product Name Fully Visible in Every Device */}
-        <div className="flex flex-col min-w-0 pt-0.5 flex-1 justify-start">
+        <div
+          onClick={handleBuyNow}
+          className="flex flex-col min-w-0 pt-0.5 flex-1 justify-start cursor-pointer group/title"
+          title={isOutOfStock ? product.name : `Click to shop ${product.name}`}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleBuyNow(e as any);
+            }
+          }}
+        >
           <h3
             title={product.name}
-            className="text-xs sm:text-sm font-bold text-slate-800 leading-snug break-words group-hover:text-[#15803d] transition-colors"
+            className="text-xs sm:text-sm font-bold text-slate-800 leading-snug break-words group-hover/title:text-[#15803d] transition-colors"
           >
             {product.name}
           </h3>

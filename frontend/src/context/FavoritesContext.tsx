@@ -255,6 +255,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       <AuthRequiredModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+        mode="favorite"
       />
     </FavoritesContext.Provider>
   );

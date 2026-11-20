@@ -189,6 +189,45 @@ export default function CartPage() {
     );
   }
 
+  // If customer is not logged in, they cannot shop or checkout; prompt login/signup
+  if (!isLoading && !isAuthenticated) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
+        <div className="w-20 h-20 rounded-3xl bg-emerald-50 border border-emerald-100 text-[#15803d] flex items-center justify-center mx-auto mb-6 shadow-xs">
+          <ShoppingBag className="w-10 h-10 text-[#15803d]" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+          Sign In to Start Shopping
+        </h1>
+        <p className="text-sm text-slate-600 mt-3 mb-8 max-w-md mx-auto leading-relaxed">
+          You must be logged in to access your cart, shop from neighborhood stores, and place orders with 15-30 minute doorstep delivery.
+        </p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 max-w-sm mx-auto">
+          <Link
+            href="/login?redirect=/cart"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-white bg-[#15803d] hover:bg-[#166534] shadow-sm transition-all text-sm cursor-pointer"
+          >
+            <span>Log In</span>
+          </Link>
+          <Link
+            href="/signup?redirect=/cart"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold text-[#15803d] bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 transition-all text-sm cursor-pointer"
+          >
+            <span>Sign Up</span>
+          </Link>
+        </div>
+        <div className="mt-6">
+          <Link
+            href="/"
+            className="text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors"
+          >
+            ← Back to Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (orderPlaced) {
     const snap = placedOrderDetails?.deliveryAddress;
 
